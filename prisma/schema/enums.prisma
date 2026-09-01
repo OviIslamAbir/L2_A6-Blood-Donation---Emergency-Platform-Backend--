@@ -80,3 +80,9 @@ enum NotificationType {
   PAYMENT
   SYSTEM
 }
+enum DonorApplicationStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}

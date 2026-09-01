@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Email Verification - Blood Donation</title>
+  <title>Welcome - Blood Donation Platform</title>
 
   <style>
     * {
@@ -22,7 +22,7 @@
     .container {
       max-width: 520px;
       margin: 0 auto;
-      background: #ffffff;
+      background: #fff;
       border-radius: 12px;
       overflow: hidden;
       box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
@@ -31,18 +31,17 @@
     .header {
       background: #dc2626;
       color: white;
-      padding: 30px;
       text-align: center;
+      padding: 35px 25px;
+    }
+
+    .blood-icon {
+      font-size: 45px;
+      margin-bottom: 10px;
     }
 
     .header h1 {
-      font-size: 26px;
-      margin-bottom: 8px;
-    }
-
-    .header p {
-      font-size: 14px;
-      opacity: 0.9;
+      font-size: 25px;
     }
 
     .content {
@@ -60,27 +59,13 @@
       margin-bottom: 15px;
     }
 
-    .otp-box {
-      text-align: center;
-      margin: 30px 0;
-    }
-
-    .otp {
-      display: inline-block;
-      padding: 18px 30px;
+    .success-box {
       background: #fef2f2;
-      color: #dc2626;
-      border: 2px dashed #dc2626;
-      border-radius: 10px;
-      font-size: 32px;
-      font-weight: bold;
-      letter-spacing: 10px;
-    }
-
-    .expiry {
-      text-align: center;
-      color: #666;
-      font-size: 14px;
+      border-left: 4px solid #dc2626;
+      padding: 15px;
+      margin: 25px 0;
+      border-radius: 5px;
+      color: #991b1b;
     }
 
     .footer {
@@ -94,41 +79,36 @@
 </head>
 
 <body>
+
   <div class="container">
 
     <div class="header">
-      <h1>🩸 Blood Donation Platform</h1>
-      <p>Save Lives • Donate Blood • Help Others</p>
+      <div class="blood-icon">🩸</div>
+      <h1>Welcome to Blood Donation Platform</h1>
     </div>
 
     <div class="content">
 
-      <h2>Email Verification</h2>
+      <h2>Hello <%= name %>!</h2>
 
       <p>
-        Hello <strong><%= name %></strong>,
+        Your account has been successfully created and your email
+        has been verified.
       </p>
 
-      <p>
-        Thank you for registering with our Blood Donation Platform.
-        Please verify your email address to activate your account.
-      </p>
-
-      <p>
-        Your verification code is:
-      </p>
-
-      <div class="otp-box">
-        <div class="otp"><%= otp %></div>
+      <div class="success-box">
+        <strong>✓ Account Verified Successfully</strong>
       </div>
 
-      <p class="expiry">
-        This verification code will expire in
-        <strong><%= expirationMinutes %> minutes</strong>.
+      <p>
+        You can now use our platform to find blood donors,
+        respond to blood requests, manage your donor profile,
+        and help save lives.
       </p>
 
       <p>
-        If you did not create this account, please ignore this email.
+        Every blood donation can make a real difference.
+        Thank you for joining our community.
       </p>
 
     </div>
@@ -138,5 +118,6 @@
     </div>
 
   </div>
+
 </body>
 </html>

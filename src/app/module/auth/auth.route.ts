@@ -1,42 +1,133 @@
+
 import { Router } from "express";
+
 import { Role } from "../../../generated/prisma/enums";
+
 import { auth } from "../../middleware/checkAuth";
+import { validateRequest } from "../../middleware/validateRequest";
+
 import { AuthController } from "./auth.controller";
 import { userValidation } from "./auth.validation";
-import { validateRequest } from "../../middleware/validateRequest";
 
 const router = Router();
 
+// ======================================================
+// PUBLIC ROUTES
+// ======================================================
+
+// Register -> REQUESTER
 router.post(
-	"/register",
-	validateRequest(userValidation.PatientRegistrationZodSchema),
-	AuthController.registerPatient,
+  "/register",
+  validateRequest(
+    userValidation.registerUserSchema,
+  ),
+  AuthController.registerUser,
 );
+
+// Verify email
 router.post(
-	"/verify-email",
-	validateRequest(userValidation.PatientEmailVerifyZodSchema),
-	AuthController.verifyPatientEmail,
+  "/verify-email",
+  validateRequest(
+    userValidation.verifyEmailSchema,
+  ),
+  AuthController.verifyEmail,
 );
+
+// Email + password login
 router.post(
-	"/login",
-	validateRequest(userValidation.PatientLoginZodSchema),
-	AuthController.loginUser,
+  "/login",
+  validateRequest(
+    userValidation.loginUserSchema,
+  ),
+  AuthController.loginUser,
 );
+
+// Google login
+router.post(
+  "/google",
+  validateRequest(
+    userValidation.googleLoginSchema,
+  ),
+  AuthController.googleLogin,
+);
+
+// Forgot password
+router.post(
+  "/forgot-password",
+  validateRequest(
+    userValidation.forgotPasswordSchema,
+  ),
+  AuthController.forgotPassword,
+);
+
+// Reset password
+router.post(
+  "/reset-password",
+  validateRequest(
+    userValidation.resetPasswordSchema,
+  ),
+  AuthController.resetPassword,
+);
+
+// Refresh token
+router.post(
+  "/refresh-token",
+  AuthController.refreshToken,
+);
+
+// Logout
+router.post(
+  "/logout",
+  AuthController.logoutUser,
+);
+
+// ======================================================
+// PROTECTED ROUTES
+// ======================================================
+
 router.get(
-	"/me",
-	auth(Role.ADMIN, Role.DOCTOR, Role.PATIENT, Role.SUPER_ADMIN),
-	AuthController.getMe,
+  "/me",
+  auth(
+    Role.REQUESTER,
+    Role.DONOR,
+    Role.ADMIN,
+  ),
+  AuthController.getMe,
 );
-router.post("/refresh-token", AuthController.refreshToken);
-router.post("/google", AuthController.googleLogin);
+
+// ======================================================
+// DONOR APPLICATION
+// REQUESTER ONLY
+// ======================================================
+
 router.post(
-	"/forgot-password",
-	validateRequest(userValidation.ForgotPasswordZodSchema),
-	AuthController.forgotPassword,
+  "/apply-donor",
+  auth(Role.REQUESTER),
+  validateRequest(
+    userValidation.donorApplicationSchema,
+  ),
+  AuthController.applyForDonor,
 );
-router.post(
-	"/reset-password",
-	validateRequest(userValidation.ResetPasswordZodSchema),
-	AuthController.resetPassword,
+
+// ======================================================
+// ADMIN - APPROVE DONOR
+// ======================================================
+
+router.patch(
+  "/admin/donor/:userId/approve",
+  auth(Role.ADMIN),
+  AuthController.approveDonorApplication,
 );
+
+// ======================================================
+// ADMIN - REJECT DONOR
+// ======================================================
+
+router.patch(
+  "/admin/donor/:userId/reject",
+  auth(Role.ADMIN),
+  AuthController.rejectDonorApplication,
+);
+
 export const AuthRoutes = router;
+
