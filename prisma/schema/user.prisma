@@ -1,0 +1,33 @@
+model User {
+  id          String   @id @default(uuid())
+
+  name        String
+  email       String   @unique
+  password    String?
+  phone       String?  @unique
+
+  role        Role     @default(DONOR)
+
+  googleId    String?  @unique
+
+  isActive    Boolean  @default(true)
+  deletedAt   DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  donorProfile DonorProfile?
+
+  bloodRequests BloodRequest[] @relation("RequesterRequests")
+
+  notifications Notification[]
+
+  payments Payment[]
+
+  auditLogs AuditLog[]
+
+  @@index([role])
+  @@index([email])
+  @@index([deletedAt])
+  @@index([createdAt])
+}

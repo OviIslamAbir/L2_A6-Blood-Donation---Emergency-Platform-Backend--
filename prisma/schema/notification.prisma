@@ -1,0 +1,20 @@
+model Notification {
+  id          String @id @default(uuid())
+
+  userId      String
+
+  user        User @relation(fields: [userId],references: [id])
+
+  title       String
+  message     String
+
+  type        NotificationType
+
+  isRead      Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}

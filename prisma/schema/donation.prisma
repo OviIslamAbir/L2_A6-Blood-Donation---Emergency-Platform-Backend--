@@ -1,0 +1,23 @@
+model Donation {
+  id          String   @id @default(uuid())
+
+  donorId     String
+  requestId   String
+
+  donor       DonorProfile @relation(fields: [donorId], references: [id] )
+  request     BloodRequest @relation(fields: [requestId], references: [id] )
+
+  status      DonationStatus @default(SCHEDULED)
+
+  donatedAt   DateTime?
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([donorId, requestId])
+
+  @@index([donorId])
+  @@index([requestId])
+  @@index([status])
+}

@@ -1,0 +1,26 @@
+model DonorMatch {
+  id           String   @id @default(uuid())
+
+  requestId    String
+  donorId      String
+
+  request      BloodRequest @relation(fields: [requestId],references: [id])
+
+  donor        DonorProfile @relation( fields: [donorId],references: [id])
+
+  distanceKm   Decimal?
+  matchScore   Int?
+
+  status       MatchStatus @default(PENDING)
+
+  notifiedAt   DateTime?
+  respondedAt  DateTime?
+
+  createdAt    DateTime @default(now())
+
+  @@unique([requestId, donorId])
+  @@index([requestId])
+  @@index([donorId])
+  @@index([status])
+  @@index([matchScore])
+}
