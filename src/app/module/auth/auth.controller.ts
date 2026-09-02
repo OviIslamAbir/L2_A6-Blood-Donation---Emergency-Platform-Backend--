@@ -398,80 +398,6 @@ const applyForDonor = catchAsync(
 );
 
 // ======================================================
-// APPROVE DONOR
-// ======================================================
-
-const approveDonorApplication =
-  catchAsync(
-    async (
-      req: Request,
-      res: Response,
-    ) => {
-      const admin =
-        req.user as IRequestUser;
-
-      if (!admin) {
-        throw new Error(
-          "User information is missing in the request",
-        );
-      }
-
-      const result =
-        await AuthService
-          .approveDonorApplication({
-            userId:
-              req.params.userId as string,
-            adminId: admin.userId,
-          });
-
-      sendResponse(res, {
-        statusCode: httpStatus.OK,
-        success: true,
-        message: result.message,
-        data: result.user,
-      });
-    },
-  );
-
-// ======================================================
-// REJECT DONOR
-// ======================================================
-
-const rejectDonorApplication =
-  catchAsync(
-    async (
-      req: Request,
-      res: Response,
-    ) => {
-      const admin =
-        req.user as IRequestUser;
-
-      if (!admin) {
-        throw new Error(
-          "User information is missing in the request",
-        );
-      }
-
-      const result =
-        await AuthService
-          .rejectDonorApplication({
-            userId:
-              req.params.userId as string,
-            adminId: admin.userId,
-            reason:
-              req.body?.reason,
-          });
-
-      sendResponse(res, {
-        statusCode: httpStatus.OK,
-        success: true,
-        message: result.message,
-        data: null,
-      });
-    },
-  );
-
-// ======================================================
 // EXPORT
 // ======================================================
 
@@ -486,7 +412,5 @@ export const AuthController = {
   resetPassword,
   logoutUser,
   applyForDonor,
-  approveDonorApplication,
-  rejectDonorApplication,
 };
 

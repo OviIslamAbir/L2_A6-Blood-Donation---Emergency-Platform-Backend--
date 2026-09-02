@@ -109,25 +109,7 @@ router.post(
   AuthController.applyForDonor,
 );
 
-// ======================================================
-// ADMIN - APPROVE DONOR
-// ======================================================
 
-router.patch(
-  "/admin/donor/:userId/approve",
-  auth(Role.ADMIN),
-  AuthController.approveDonorApplication,
-);
-
-// ======================================================
-// ADMIN - REJECT DONOR
-// ======================================================
-
-router.patch(
-  "/admin/donor/:userId/reject",
-  auth(Role.ADMIN),
-  AuthController.rejectDonorApplication,
-);
 
 export const AuthRoutes = router;
 

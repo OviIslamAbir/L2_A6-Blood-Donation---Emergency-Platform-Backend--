@@ -61,13 +61,3 @@ export interface IRegisterUserPayload {
   email: string;
   password: string;
 }
-export interface IApproveDonorPayload {
-  userId: string;
-  adminId: string;
-}
-
-export interface IRejectDonorPayload {
-  userId: string;
-  adminId: string;
-  reason?: string;
-}
