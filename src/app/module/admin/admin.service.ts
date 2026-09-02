@@ -1,9 +1,7 @@
 import path from "path";
 import ejs from "ejs";
 
-import {
-	Role,
-} from "../../../generated/prisma/enums";
+import { Role } from "../../../generated/prisma/enums";
 
 import config from "../../config";
 import { prisma } from "../../lib/prisma";
@@ -15,7 +13,6 @@ import type {
 	IGetUsersQuery,
 	IUpdateUserStatusPayload,
 } from "./admin.interface";
-
 
 // ======================================================
 // GET ALL DONOR APPLICATIONS
@@ -42,7 +39,6 @@ const getDonorApplications = async () => {
 	return applications;
 };
 
-
 // ======================================================
 // GET PENDING DONOR APPLICATIONS
 // ======================================================
@@ -67,15 +63,12 @@ const getPendingDonorApplications = async () => {
 	return applications;
 };
 
-
 // ======================================================
 // APPROVE DONOR APPLICATION
 // REQUESTER -> DONOR
 // ======================================================
 
-const approveDonorApplication = async (
-	payload: IApproveDonorPayload,
-) => {
+const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
@@ -94,16 +87,13 @@ const approveDonorApplication = async (
 	}
 
 	if (user.role !== Role.REQUESTER) {
-		throw new Error(
-			"Only requester accounts can be approved as donors.",
-		);
+		throw new Error("Only requester accounts can be approved as donors.");
 	}
 
 	if (user.donorApplicationStatus !== "PENDING") {
 		throw new Error("This application is not pending.");
 	}
 
-	// Donor must have password login
 	if (!user.password) {
 		throw new Error(
 			"This user does not have a password login. Donor approval is not allowed.",
@@ -134,7 +124,6 @@ const approveDonorApplication = async (
 		},
 	});
 
-	// Send approval email
 	try {
 		const templatePath = path.join(
 			process.cwd(),
@@ -161,14 +150,11 @@ const approveDonorApplication = async (
 	};
 };
 
-
 // ======================================================
 // REJECT DONOR APPLICATION
 // ======================================================
 
-const rejectDonorApplication = async (
-	payload: IRejectDonorPayload,
-) => {
+const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
@@ -214,14 +200,11 @@ const rejectDonorApplication = async (
 	};
 };
 
-
 // ======================================================
 // GET ALL USERS
 // ======================================================
 
-const getAllUsers = async (
-	query: IGetUsersQuery,
-) => {
+const getAllUsers = async (query: IGetUsersQuery) => {
 	const page = Number(query.page) || 1;
 	const limit = Number(query.limit) || 10;
 
@@ -229,7 +212,6 @@ const getAllUsers = async (
 
 	const where: any = {};
 
-	// Search by name/email
 	if (query.search) {
 		where.OR = [
 			{
@@ -247,12 +229,10 @@ const getAllUsers = async (
 		];
 	}
 
-	// Filter role
 	if (query.role) {
 		where.role = query.role;
 	}
 
-	// Filter active status
 	if (query.isActive !== undefined) {
 		where.isActive = query.isActive === "true";
 	}
@@ -286,7 +266,6 @@ const getAllUsers = async (
 	};
 };
 
-
 // ======================================================
 // GET SINGLE USER
 // ======================================================
@@ -312,14 +291,11 @@ const getSingleUser = async (userId: string) => {
 	return user;
 };
 
-
 // ======================================================
 // ACTIVATE / DEACTIVATE USER
 // ======================================================
 
-const updateUserStatus = async (
-	payload: IUpdateUserStatusPayload,
-) => {
+const updateUserStatus = async (payload: IUpdateUserStatusPayload) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
@@ -330,11 +306,8 @@ const updateUserStatus = async (
 		throw new Error("User not found.");
 	}
 
-	// Prevent admin from disabling another admin
 	if (user.role === Role.ADMIN) {
-		throw new Error(
-			"Admin accounts cannot be deactivated from this endpoint.",
-		);
+		throw new Error("Admin accounts cannot be deactivated from this endpoint.");
 	}
 
 	const updatedUser = await prisma.user.update({
@@ -357,14 +330,11 @@ const updateUserStatus = async (
 	};
 };
 
-
 // ======================================================
 // DELETE USER
 // ======================================================
 
-const deleteUser = async (
-	userId: string,
-) => {
+const deleteUser = async (userId: string) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: userId,
@@ -397,7 +367,6 @@ const deleteUser = async (
 		user: deletedUser,
 	};
 };
-
 
 // ======================================================
 // DASHBOARD STATISTICS
@@ -483,7 +452,6 @@ const getDashboardStats = async () => {
 		},
 	};
 };
-
 
 export const AdminService = {
 	getDonorApplications,

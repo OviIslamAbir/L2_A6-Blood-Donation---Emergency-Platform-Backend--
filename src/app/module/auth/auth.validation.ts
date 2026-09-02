@@ -1,4 +1,3 @@
-
 import z from "zod";
 
 // ======================================================
@@ -7,43 +6,39 @@ import z from "zod";
 // ======================================================
 
 const registerUserSchema = z.object({
-  name: z
-    .string()
-    .min(3, {
-      message: "Name must be at least 3 characters long",
-    })
-    .max(50, {
-      message: "Name cannot exceed 50 characters",
-    }),
+	name: z
+		.string()
+		.min(3, {
+			message: "Name must be at least 3 characters long",
+		})
+		.max(50, {
+			message: "Name cannot exceed 50 characters",
+		}),
 
-  email: z.email({
-    message: "Please provide a valid email address",
-  }),
+	email: z.email({
+		message: "Please provide a valid email address",
+	}),
 
-  password: z
-    .string()
-    .min(8, {
-      message: "Password must be at least 8 characters long",
-    })
-    .max(32, {
-      message: "Password cannot exceed 32 characters",
-    })
-    .regex(/[A-Z]/, {
-      message:
-        "Password must contain at least one uppercase letter",
-    })
-    .regex(/[a-z]/, {
-      message:
-        "Password must contain at least one lowercase letter",
-    })
-    .regex(/[0-9]/, {
-      message:
-        "Password must contain at least one number",
-    })
-    .regex(/[^A-Za-z0-9]/, {
-      message:
-        "Password must contain at least one special character",
-    }),
+	password: z
+		.string()
+		.min(8, {
+			message: "Password must be at least 8 characters long",
+		})
+		.max(32, {
+			message: "Password cannot exceed 32 characters",
+		})
+		.regex(/[A-Z]/, {
+			message: "Password must contain at least one uppercase letter",
+		})
+		.regex(/[a-z]/, {
+			message: "Password must contain at least one lowercase letter",
+		})
+		.regex(/[0-9]/, {
+			message: "Password must contain at least one number",
+		})
+		.regex(/[^A-Za-z0-9]/, {
+			message: "Password must contain at least one special character",
+		}),
 });
 
 // ======================================================
@@ -51,18 +46,18 @@ const registerUserSchema = z.object({
 // ======================================================
 
 const verifyEmailSchema = z.object({
-  email: z.email({
-    message: "Please provide a valid email address",
-  }),
+	email: z.email({
+		message: "Please provide a valid email address",
+	}),
 
-  otp: z
-    .string()
-    .length(6, {
-      message: "OTP must be exactly 6 digits",
-    })
-    .regex(/^[0-9]+$/, {
-      message: "OTP must contain only numbers",
-    }),
+	otp: z
+		.string()
+		.length(6, {
+			message: "OTP must be exactly 6 digits",
+		})
+		.regex(/^[0-9]+$/, {
+			message: "OTP must contain only numbers",
+		}),
 });
 
 // ======================================================
@@ -70,18 +65,18 @@ const verifyEmailSchema = z.object({
 // ======================================================
 
 const loginUserSchema = z.object({
-  email: z.email({
-    message: "Please provide a valid email address",
-  }),
+	email: z.email({
+		message: "Please provide a valid email address",
+	}),
 
-  password: z
-    .string()
-    .min(8, {
-      message: "Password must be at least 8 characters long",
-    })
-    .max(32, {
-      message: "Password cannot exceed 32 characters",
-    }),
+	password: z
+		.string()
+		.min(8, {
+			message: "Password must be at least 8 characters long",
+		})
+		.max(32, {
+			message: "Password cannot exceed 32 characters",
+		}),
 });
 
 // ======================================================
@@ -89,9 +84,9 @@ const loginUserSchema = z.object({
 // ======================================================
 
 const googleLoginSchema = z.object({
-  idToken: z.string().min(1, {
-    message: "Google ID token is required",
-  }),
+	idToken: z.string().min(1, {
+		message: "Google ID token is required",
+	}),
 });
 
 // ======================================================
@@ -99,9 +94,9 @@ const googleLoginSchema = z.object({
 // ======================================================
 
 const forgotPasswordSchema = z.object({
-  email: z.email({
-    message: "Please provide a valid email address",
-  }),
+	email: z.email({
+		message: "Please provide a valid email address",
+	}),
 });
 
 // ======================================================
@@ -109,43 +104,39 @@ const forgotPasswordSchema = z.object({
 // ======================================================
 
 const resetPasswordSchema = z.object({
-  email: z.email({
-    message: "Please provide a valid email address",
-  }),
+	email: z.email({
+		message: "Please provide a valid email address",
+	}),
 
-  otp: z
-    .string()
-    .length(6, {
-      message: "OTP must be exactly 6 digits",
-    })
-    .regex(/^[0-9]+$/, {
-      message: "OTP must contain only numbers",
-    }),
+	otp: z
+		.string()
+		.length(6, {
+			message: "OTP must be exactly 6 digits",
+		})
+		.regex(/^[0-9]+$/, {
+			message: "OTP must contain only numbers",
+		}),
 
-  newPassword: z
-    .string()
-    .min(8, {
-      message: "Password must be minimum 8 characters long",
-    })
-    .max(32, {
-      message: "Password cannot exceed 32 characters",
-    })
-    .regex(/[a-z]/, {
-      message:
-        "Password must contain at least 1 lowercase letter",
-    })
-    .regex(/[A-Z]/, {
-      message:
-        "Password must contain at least 1 uppercase letter",
-    })
-    .regex(/[0-9]/, {
-      message:
-        "Password must contain at least 1 number",
-    })
-    .regex(/[^A-Za-z0-9]/, {
-      message:
-        "Password must contain at least 1 special character",
-    }),
+	newPassword: z
+		.string()
+		.min(8, {
+			message: "Password must be minimum 8 characters long",
+		})
+		.max(32, {
+			message: "Password cannot exceed 32 characters",
+		})
+		.regex(/[a-z]/, {
+			message: "Password must contain at least 1 lowercase letter",
+		})
+		.regex(/[A-Z]/, {
+			message: "Password must contain at least 1 uppercase letter",
+		})
+		.regex(/[0-9]/, {
+			message: "Password must contain at least 1 number",
+		})
+		.regex(/[^A-Za-z0-9]/, {
+			message: "Password must contain at least 1 special character",
+		}),
 });
 
 // ======================================================
@@ -153,31 +144,27 @@ const resetPasswordSchema = z.object({
 // ======================================================
 
 const donorApplicationSchema = z.object({
-  bloodGroup: z.string().min(1, {
-    message: "Blood group is required",
-  }),
+	bloodGroup: z.string().min(1, {
+		message: "Blood group is required",
+	}),
 
-  dateOfBirth: z.string().optional(),
+	dateOfBirth: z.string().optional(),
 
-  division: z.string().min(1, {
-    message: "Division is required",
-  }),
+	division: z.string().min(1, {
+		message: "Division is required",
+	}),
 
-  district: z.string().min(1, {
-    message: "District is required",
-  }),
+	district: z.string().min(1, {
+		message: "District is required",
+	}),
 
-  address: z.string().min(1, {
-    message: "Address is required",
-  }),
+	address: z.string().min(1, {
+		message: "Address is required",
+	}),
 
-  latitude: z
-    .number()
-    .optional(),
+	latitude: z.number().optional(),
 
-  longitude: z
-    .number()
-    .optional(),
+	longitude: z.number().optional(),
 });
 
 // ======================================================
@@ -185,12 +172,11 @@ const donorApplicationSchema = z.object({
 // ======================================================
 
 export const userValidation = {
-  registerUserSchema,
-  verifyEmailSchema,
-  loginUserSchema,
-  googleLoginSchema,
-  forgotPasswordSchema,
-  resetPasswordSchema,
-  donorApplicationSchema,
+	registerUserSchema,
+	verifyEmailSchema,
+	loginUserSchema,
+	googleLoginSchema,
+	forgotPasswordSchema,
+	resetPasswordSchema,
+	donorApplicationSchema,
 };
-

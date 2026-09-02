@@ -9,7 +9,6 @@ export const seedTesterAdmin = async () => {
 		const email = config.tester_admin_email;
 		const password = config.tester_admin_password;
 
-		// Check env/config first
 		if (!name || !email || !password) {
 			throw new Error(
 				"Tester Admin Name, Email, or Password is missing in the ENV file!!!",
@@ -38,7 +37,6 @@ export const seedTesterAdmin = async () => {
 				email,
 				password: hashedPassword,
 				role: Role.ADMIN,
-				needPasswordChange: false,
 				emailVerified: true,
 				isActive: true,
 			},

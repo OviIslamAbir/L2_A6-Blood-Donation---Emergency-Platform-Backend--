@@ -7,11 +7,9 @@ const rejectDonorSchema = z.object({
 		.optional(),
 });
 
-
 const updateUserStatusSchema = z.object({
 	isActive: z.boolean(),
 });
-
 
 export const adminValidation = {
 	rejectDonorSchema,

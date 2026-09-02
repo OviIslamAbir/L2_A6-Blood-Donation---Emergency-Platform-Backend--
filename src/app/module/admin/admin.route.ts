@@ -9,17 +9,11 @@ import { adminValidation } from "./admin.validation";
 
 const router = Router();
 
-
 // ======================================================
 // DASHBOARD
 // ======================================================
 
-router.get(
-	"/dashboard",
-	auth(Role.ADMIN),
-	AdminController.getDashboardStats,
-);
-
+router.get("/dashboard", auth(Role.ADMIN), AdminController.getDashboardStats);
 
 // ======================================================
 // DONOR APPLICATIONS
@@ -31,13 +25,11 @@ router.get(
 	AdminController.getDonorApplications,
 );
 
-
 router.get(
 	"/donor-applications/pending",
 	auth(Role.ADMIN),
 	AdminController.getPendingDonorApplications,
 );
-
 
 // ======================================================
 // APPROVE DONOR
@@ -48,7 +40,6 @@ router.patch(
 	auth(Role.ADMIN),
 	AdminController.approveDonorApplication,
 );
-
 
 // ======================================================
 // REJECT DONOR
@@ -61,24 +52,13 @@ router.patch(
 	AdminController.rejectDonorApplication,
 );
 
-
 // ======================================================
 // USERS
 // ======================================================
 
-router.get(
-	"/users",
-	auth(Role.ADMIN),
-	AdminController.getAllUsers,
-);
+router.get("/users", auth(Role.ADMIN), AdminController.getAllUsers);
 
-
-router.get(
-	"/users/:userId",
-	auth(Role.ADMIN),
-	AdminController.getSingleUser,
-);
-
+router.get("/users/:userId", auth(Role.ADMIN), AdminController.getSingleUser);
 
 // ======================================================
 // ACTIVATE / DEACTIVATE USER
@@ -91,16 +71,10 @@ router.patch(
 	AdminController.updateUserStatus,
 );
 
-
 // ======================================================
 // DELETE USER
 // ======================================================
 
-router.delete(
-	"/users/:userId",
-	auth(Role.ADMIN),
-	AdminController.deleteUser,
-);
-
+router.delete("/users/:userId", auth(Role.ADMIN), AdminController.deleteUser);
 
 export const AdminRoutes = router;

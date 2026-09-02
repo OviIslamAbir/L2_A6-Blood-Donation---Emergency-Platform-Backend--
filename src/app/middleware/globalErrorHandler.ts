@@ -3,7 +3,6 @@ import httpStatus from "http-status";
 import { Prisma } from "../../generated/prisma/client";
 import config from "../config";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const globalErrorHandler = async (
 	err: any,
 	_req: Request,
