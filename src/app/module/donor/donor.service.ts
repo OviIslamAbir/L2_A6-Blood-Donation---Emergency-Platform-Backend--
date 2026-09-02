@@ -97,10 +97,113 @@ const getDonorApplicationStatus = async (
     donorProfile: user.donorProfile,
   };
 };
+
+// ======================================================
+// UPDATE DONOR PROFILE
+// ======================================================
+
+const updateDonorProfile = async (
+  userId: string,
+  payload: IDonorProfileUpdatePayload,
+) => {
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+
+    include: {
+      donorProfile: true,
+    },
+  });
+
+  if (!user) {
+    throw new Error("User not found.");
+  }
+
+  if (user.role !== Role.DONOR) {
+    throw new Error(
+      "Only approved donors can update donor profile.",
+    );
+  }
+
+  if (!user.isActive) {
+    throw new Error("Your account is inactive.");
+  }
+
+  if (user.deletedAt) {
+    throw new Error("Your account has been deleted.");
+  }
+
+  if (!user.donorProfile) {
+    throw new Error("Donor profile not found.");
+  }
+
+
+  let bloodGroup: BloodGroup | undefined;
+
+  if (payload.bloodGroup) {
+    bloodGroup =
+      bloodGroupMap[payload.bloodGroup];
+
+    if (!bloodGroup) {
+      throw new Error(
+        "Invalid blood group.",
+      );
+    }
+  }
+
+
+  const donorProfile =
+    await prisma.donorProfile.update({
+      where: {
+        userId,
+      },
+
+      data: {
+        ...(bloodGroup && {
+          bloodGroup,
+        }),
+
+        ...(payload.dateOfBirth && {
+          dateOfBirth:
+            new Date(payload.dateOfBirth),
+        }),
+
+        ...(payload.division && {
+          division: payload.division,
+        }),
+
+        ...(payload.district && {
+          district: payload.district,
+        }),
+
+        ...(payload.address && {
+          address: payload.address,
+        }),
+
+        ...(payload.latitude !== undefined && {
+          latitude: payload.latitude,
+        }),
+
+        ...(payload.longitude !== undefined && {
+          longitude: payload.longitude,
+        }),
+      },
+    });
+
+
+  return {
+    message:
+      "Donor profile updated successfully.",
+
+    donorProfile,
+  };
+};
+
 export const DonorService = {
   getDonorProfile,
   getDonorApplicationStatus,
-//   updateDonorProfile,
+  updateDonorProfile,
 //   getMyNotifications,
 //   getUnreadNotificationCount,
 //   markNotificationAsRead,

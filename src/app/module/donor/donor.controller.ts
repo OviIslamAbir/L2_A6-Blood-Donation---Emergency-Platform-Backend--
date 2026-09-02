@@ -59,16 +59,42 @@ const getDonorApplicationStatus =
       });
     },
   );
+// ======================================================
+// UPDATE PROFILE
+// ======================================================
 
+const updateDonorProfile =
+  catchAsync(
+    async (
+      req: Request,
+      res: Response,
+    ) => {
 
-  // ======================================================
+      const result =
+        await DonorService
+          .updateDonorProfile(
+            req.user!.userId,
+            req.body,
+          );
+
+      sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message:
+          "Donor profile updated successfully.",
+        data: result,
+      });
+    },
+  );
+
+// ======================================================
 // EXPORT
 // ======================================================
 
 export const DonorController = {
   getDonorProfile,
   getDonorApplicationStatus,
-//   updateDonorProfile,
+  updateDonorProfile,
 //   getMyNotifications,
 //   getUnreadNotificationCount,
 //   markNotificationAsRead,
