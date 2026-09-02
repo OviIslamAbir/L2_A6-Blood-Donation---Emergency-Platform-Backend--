@@ -36,6 +36,36 @@ router.patch(
   ),
   DonorController.updateDonorProfile,
 );
-    
+// ======================================================
+// NOTIFICATIONS
+// ======================================================
+
+router.get(
+  "/notifications",
+  auth(Role.DONOR),
+  DonorController.getMyNotifications,
+);
+
+
+router.get(
+  "/notifications/unread-count",
+  auth(Role.DONOR),
+  DonorController.getUnreadNotificationCount,
+);
+
+
+router.patch(
+  "/notifications/read-all",
+  auth(Role.DONOR),
+  DonorController.markAllNotificationsAsRead,
+);
+
+
+router.patch(
+  "/notifications/:notificationId/read",
+  auth(Role.DONOR),
+  DonorController.markNotificationAsRead,
+);
+  
 
 export const DonorRoutes = router;
