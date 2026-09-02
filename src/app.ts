@@ -11,6 +11,7 @@ import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 import { notFound } from "./app/middleware/notFound";
 import { AuthRoutes } from "./app/module/auth/auth.route";
 import { AdminRoutes } from "./app/module/admin/admin.route";
+import { DonorRoutes } from "./app/module/donor/donor.route";
 
 const app: Application = express();
 
@@ -30,6 +31,7 @@ app.use(cookieParser());
 
 app.use("/api/v1/auth", AuthRoutes);
 app.use("/api/v1/admin", AdminRoutes);
+app.use("/api/v1/donor", DonorRoutes);
 
 // Basic route
 app.get("/", async (req: Request, res: Response) => {
