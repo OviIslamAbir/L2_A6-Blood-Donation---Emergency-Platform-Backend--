@@ -4,9 +4,9 @@ model Payment {
   userId         String
   requestId      String
 
-  user           User @relation(fields: [userId],references: [id])
+  user          User @relation(fields: [userId],references: [id] )
 
-  request        BloodRequest @relation(fields: [requestId], references: [id] )
+  request       BloodRequest @relation( fields: [requestId], references: [id])
 
   amount         Decimal
   currency       String @default("BDT")

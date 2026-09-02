@@ -1,31 +1,38 @@
 model DonorProfile {
-  id              String       @id @default(uuid())
-  userId          String       @unique
-  user            User         @relation(fields: [userId], references: [id])
+  id              String   @id @default(uuid())
+  userId          String   @unique
+
+  user            User     @relation(fields: [userId], references: [id])
 
   bloodGroup      BloodGroup
   dateOfBirth     DateTime?
+
   lastDonationAt  DateTime?
-  totalDonations  Int          @default(0)
-  isAvailable     Boolean      @default(true)
+  totalDonations  Int      @default(0)
+
+  isAvailable     Boolean  @default(true)
 
   division        String?
   district        String?
   address         String?
+
   latitude        Decimal?
   longitude       Decimal?
 
   donorMatches    DonorMatch[]
   donations       Donation[]
 
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
- appliedAt     DateTime  @default(now())
-  approvedAt    DateTime?
-  rejectedAt    DateTime?
-  rejectReason  String?
+  appliedAt       DateTime @default(now())
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectReason    String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
   @@index([bloodGroup])
   @@index([isAvailable])
   @@index([district])
   @@index([createdAt])
 }
+

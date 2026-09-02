@@ -2,100 +2,106 @@ import { BloodGroup, Role } from "../../../generated/prisma/enums";
 
 import { prisma } from "../../lib/prisma";
 
-import {
-  IDonorProfileUpdatePayload,
-} from "./donor.interface";
-
+import type { IDonorProfileUpdatePayload } from "./donor.interface";
 
 // ======================================================
 // BLOOD GROUP MAP
 // ======================================================
 
 const bloodGroupMap: Record<string, BloodGroup> = {
-  "A+": BloodGroup.A_POSITIVE,
-  "A-": BloodGroup.A_NEGATIVE,
+	"A+": BloodGroup.A_POSITIVE,
+	"A-": BloodGroup.A_NEGATIVE,
 
-  "B+": BloodGroup.B_POSITIVE,
-  "B-": BloodGroup.B_NEGATIVE,
+	"B+": BloodGroup.B_POSITIVE,
+	"B-": BloodGroup.B_NEGATIVE,
 
-  "AB+": BloodGroup.AB_POSITIVE,
-  "AB-": BloodGroup.AB_NEGATIVE,
+	"AB+": BloodGroup.AB_POSITIVE,
+	"AB-": BloodGroup.AB_NEGATIVE,
 
-  "O+": BloodGroup.O_POSITIVE,
-  "O-": BloodGroup.O_NEGATIVE,
+	"O+": BloodGroup.O_POSITIVE,
+	"O-": BloodGroup.O_NEGATIVE,
 };
-
 
 // ======================================================
 // GET DONOR PROFILE
 // ======================================================
 
 const getDonorProfile = async (userId: string) => {
-  const user = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
+	const user = await prisma.user.findUnique({
+		where: {
+			id: userId,
+		},
 
-    include: {
-      donorProfile: true,
-    },
+		include: {
+			donorProfile: true,
+		},
 
-    omit: {
-      password: true,
-    },
-  });
+		omit: {
+			password: true,
+		},
+	});
 
-  if (!user) {
-    throw new Error("User not found.");
-  }
+	if (!user) {
+		throw new Error("User not found.");
+	}
 
-  if (user.role !== Role.DONOR) {
-    throw new Error("Only donors can access donor profile.");
-  }
+	if (user.deletedAt) {
+		throw new Error("Your account has been deleted.");
+	}
 
-  if (!user.isActive) {
-    throw new Error("Your account is inactive.");
-  }
+	if (!user.isActive) {
+		throw new Error("Your account is inactive.");
+	}
 
-  if (user.deletedAt) {
-    throw new Error("Your account has been deleted.");
-  }
+	if (user.role !== Role.DONOR) {
+		throw new Error("Only approved donors can access donor profile.");
+	}
 
-  return user;
+	if (!user.donorProfile) {
+		throw new Error("Donor profile not found.");
+	}
+
+	return user;
 };
-
 
 // ======================================================
 // GET DONOR APPLICATION STATUS
 // ======================================================
 
-const getDonorApplicationStatus = async (
-  userId: string,
-) => {
-  const user = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
+const getDonorApplicationStatus = async (userId: string) => {
+	const user = await prisma.user.findUnique({
+		where: {
+			id: userId,
+		},
 
-    include: {
-      donorProfile: true,
-    },
-  });
+		include: {
+			donorProfile: true,
+		},
 
-  if (!user) {
-    throw new Error("User not found.");
-  }
+		omit: {
+			password: true,
+		},
+	});
 
-  if (!user.isActive) {
-    throw new Error("Your account is inactive.");
-  }
+	if (!user) {
+		throw new Error("User not found.");
+	}
 
-  return {
-    role: user.role,
-    applicationStatus:
-      user.donorApplicationStatus,
-    donorProfile: user.donorProfile,
-  };
+	if (user.deletedAt) {
+		throw new Error("Your account has been deleted.");
+	}
+
+	if (!user.isActive) {
+		throw new Error("Your account is inactive.");
+	}
+
+	return {
+		role: user.role,
+
+		applicationStatus: user.donorApplicationStatus,
+
+		donorProfile: user.donorProfile,
+	};
 };
 
 // ======================================================
@@ -103,277 +109,280 @@ const getDonorApplicationStatus = async (
 // ======================================================
 
 const updateDonorProfile = async (
-  userId: string,
-  payload: IDonorProfileUpdatePayload,
+	userId: string,
+	payload: IDonorProfileUpdatePayload,
 ) => {
-  const user = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
+	const user = await prisma.user.findUnique({
+		where: {
+			id: userId,
+		},
 
-    include: {
-      donorProfile: true,
-    },
-  });
+		include: {
+			donorProfile: true,
+		},
+	});
 
-  if (!user) {
-    throw new Error("User not found.");
-  }
+	if (!user) {
+		throw new Error("User not found.");
+	}
 
-  if (user.role !== Role.DONOR) {
-    throw new Error(
-      "Only approved donors can update donor profile.",
-    );
-  }
+	if (user.deletedAt) {
+		throw new Error("Your account has been deleted.");
+	}
 
-  if (!user.isActive) {
-    throw new Error("Your account is inactive.");
-  }
+	if (!user.isActive) {
+		throw new Error("Your account is inactive.");
+	}
 
-  if (user.deletedAt) {
-    throw new Error("Your account has been deleted.");
-  }
+	if (user.role !== Role.DONOR) {
+		throw new Error("Only approved donors can update donor profile.");
+	}
 
-  if (!user.donorProfile) {
-    throw new Error("Donor profile not found.");
-  }
+	if (!user.donorProfile) {
+		throw new Error("Donor profile not found.");
+	}
 
+	// ==================================================
+	// BLOOD GROUP
+	// ==================================================
 
-  let bloodGroup: BloodGroup | undefined;
+	let bloodGroup: BloodGroup | undefined;
 
-  if (payload.bloodGroup) {
-    bloodGroup =
-      bloodGroupMap[payload.bloodGroup];
+	if (payload.bloodGroup !== undefined) {
+		bloodGroup = bloodGroupMap[payload.bloodGroup];
 
-    if (!bloodGroup) {
-      throw new Error(
-        "Invalid blood group.",
-      );
-    }
-  }
+		if (!bloodGroup) {
+			throw new Error("Invalid blood group.");
+		}
+	}
 
+	// ==================================================
+	// DATE OF BIRTH
+	// ==================================================
 
-  const donorProfile =
-    await prisma.donorProfile.update({
-      where: {
-        userId,
-      },
+	let dateOfBirth: Date | undefined;
 
-      data: {
-        ...(bloodGroup && {
-          bloodGroup,
-        }),
+	if (payload.dateOfBirth !== undefined) {
+		const parsedDate = new Date(payload.dateOfBirth);
 
-        ...(payload.dateOfBirth && {
-          dateOfBirth:
-            new Date(payload.dateOfBirth),
-        }),
+		if (Number.isNaN(parsedDate.getTime())) {
+			throw new Error("Invalid date of birth.");
+		}
 
-        ...(payload.division && {
-          division: payload.division,
-        }),
+		dateOfBirth = parsedDate;
+	}
 
-        ...(payload.district && {
-          district: payload.district,
-        }),
+	// ==================================================
+	// UPDATE DONOR PROFILE
+	// ==================================================
 
-        ...(payload.address && {
-          address: payload.address,
-        }),
+	const donorProfile = await prisma.donorProfile.update({
+		where: {
+			userId,
+		},
 
-        ...(payload.latitude !== undefined && {
-          latitude: payload.latitude,
-        }),
+		data: {
+			...(bloodGroup !== undefined && {
+				bloodGroup,
+			}),
 
-        ...(payload.longitude !== undefined && {
-          longitude: payload.longitude,
-        }),
-      },
-    });
+			...(dateOfBirth !== undefined && {
+				dateOfBirth,
+			}),
 
+			...(payload.division !== undefined && {
+				division: payload.division.trim(),
+			}),
 
-  return {
-    message:
-      "Donor profile updated successfully.",
+			...(payload.district !== undefined && {
+				district: payload.district.trim(),
+			}),
 
-    donorProfile,
-  };
+			...(payload.address !== undefined && {
+				address: payload.address.trim(),
+			}),
+
+			...(payload.latitude !== undefined && {
+				latitude: payload.latitude,
+			}),
+
+			...(payload.longitude !== undefined && {
+				longitude: payload.longitude,
+			}),
+		},
+	});
+
+	return {
+		message: "Donor profile updated successfully.",
+		donorProfile,
+	};
 };
 
 // ======================================================
 // GET DONOR NOTIFICATIONS
 // ======================================================
 
-const getMyNotifications = async (
-  userId: string,
-) => {
-  const user = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
-  });
+const getMyNotifications = async (userId: string) => {
+	const user = await prisma.user.findUnique({
+		where: {
+			id: userId,
+		},
 
-  if (!user) {
-    throw new Error("User not found.");
-  }
+		select: {
+			id: true,
+			role: true,
+			isActive: true,
+			deletedAt: true,
+		},
+	});
 
-  if (user.role !== Role.DONOR) {
-    throw new Error(
-      "Only donors can access notifications.",
-    );
-  }
+	if (!user) {
+		throw new Error("User not found.");
+	}
 
-  if (!user.isActive) {
-    throw new Error("Your account is inactive.");
-  }
+	if (user.deletedAt) {
+		throw new Error("Your account has been deleted.");
+	}
 
+	if (!user.isActive) {
+		throw new Error("Your account is inactive.");
+	}
 
-  const notifications =
-    await prisma.notification.findMany({
-      where: {
-        userId,
-      },
+	if (user.role !== Role.DONOR) {
+		throw new Error("Only donors can access notifications.");
+	}
 
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+	const notifications = await prisma.notification.findMany({
+		where: {
+			userId,
+		},
 
+		orderBy: {
+			createdAt: "desc",
+		},
+	});
 
-  return {
-    notifications,
-  };
+	return {
+		notifications,
+	};
 };
-
 
 // ======================================================
 // GET UNREAD NOTIFICATION COUNT
 // ======================================================
 
-const getUnreadNotificationCount = async (
-  userId: string,
-) => {
-  const user = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
-  });
+const getUnreadNotificationCount = async (userId: string) => {
+	const user = await prisma.user.findUnique({
+		where: {
+			id: userId,
+		},
 
-  if (!user) {
-    throw new Error("User not found.");
-  }
+		select: {
+			id: true,
+			role: true,
+			isActive: true,
+			deletedAt: true,
+		},
+	});
 
-  if (user.role !== Role.DONOR) {
-    throw new Error(
-      "Only donors can access notifications.",
-    );
-  }
+	if (!user) {
+		throw new Error("User not found.");
+	}
 
+	if (user.deletedAt) {
+		throw new Error("Your account has been deleted.");
+	}
 
-  const count =
-    await prisma.notification.count({
-      where: {
-        userId,
-        isRead: false,
-      },
-    });
+	if (!user.isActive) {
+		throw new Error("Your account is inactive.");
+	}
 
+	if (user.role !== Role.DONOR) {
+		throw new Error("Only donors can access notifications.");
+	}
 
-  return {
-    unreadCount: count,
-  };
+	const count = await prisma.notification.count({
+		where: {
+			userId,
+			isRead: false,
+		},
+	});
+
+	return {
+		unreadCount: count,
+	};
 };
-
 
 // ======================================================
 // MARK ONE NOTIFICATION AS READ
 // ======================================================
 
 const markNotificationAsRead = async (
-  userId: string,
-  notificationId: string,
+	userId: string,
+	notificationId: string,
 ) => {
-  const notification =
-    await prisma.notification.findUnique({
-      where: {
-        id: notificationId,
-      },
-    });
+	const notification = await prisma.notification.findUnique({
+		where: {
+			id: notificationId,
+		},
+	});
 
-  if (!notification) {
-    throw new Error(
-      "Notification not found.",
-    );
-  }
+	if (!notification) {
+		throw new Error("Notification not found.");
+	}
 
-  if (notification.userId !== userId) {
-    throw new Error(
-      "You cannot access this notification.",
-    );
-  }
+	if (notification.userId !== userId) {
+		throw new Error("You cannot access this notification.");
+	}
 
+	const updated = await prisma.notification.update({
+		where: {
+			id: notificationId,
+		},
 
-  const updated =
-    await prisma.notification.update({
-      where: {
-        id: notificationId,
-      },
+		data: {
+			isRead: true,
+		},
+	});
 
-      data: {
-        isRead: true,
-      },
-    });
-
-
-  return {
-    message:
-      "Notification marked as read.",
-
-    notification: updated,
-  };
+	return {
+		message: "Notification marked as read.",
+		notification: updated,
+	};
 };
-
 
 // ======================================================
 // MARK ALL NOTIFICATIONS AS READ
 // ======================================================
 
-const markAllNotificationsAsRead = async (
-  userId: string,
-) => {
-  const result =
-    await prisma.notification.updateMany({
-      where: {
-        userId,
-        isRead: false,
-      },
+const markAllNotificationsAsRead = async (userId: string) => {
+	const result = await prisma.notification.updateMany({
+		where: {
+			userId,
+			isRead: false,
+		},
 
-      data: {
-        isRead: true,
-      },
-    });
+		data: {
+			isRead: true,
+		},
+	});
 
-
-  return {
-    message:
-      "All notifications marked as read.",
-
-    updatedCount:
-      result.count,
-  };
+	return {
+		message: "All notifications marked as read.",
+		updatedCount: result.count,
+	};
 };
-
 
 // ======================================================
 // EXPORT
 // ======================================================
 
 export const DonorService = {
-  getDonorProfile,
-  getDonorApplicationStatus,
-  updateDonorProfile,
-  getMyNotifications,
-  getUnreadNotificationCount,
-  markNotificationAsRead,
-  markAllNotificationsAsRead,
+	getDonorProfile,
+	getDonorApplicationStatus,
+	updateDonorProfile,
+	getMyNotifications,
+	getUnreadNotificationCount,
+	markNotificationAsRead,
+	markAllNotificationsAsRead,
 };

@@ -3,6 +3,7 @@ import z from "zod";
 const rejectDonorSchema = z.object({
 	reason: z
 		.string()
+		.trim()
 		.max(500, "Reason cannot exceed 500 characters.")
 		.optional(),
 });

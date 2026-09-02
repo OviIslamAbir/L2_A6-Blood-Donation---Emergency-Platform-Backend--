@@ -1,44 +1,69 @@
 import z from "zod";
 
-const updateDonorProfileSchema = z.object({
-  bloodGroup: z
-    .enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"])
-    .optional(),
+// ======================================================
+// UPDATE DONOR PROFILE
+// ======================================================
 
-  dateOfBirth: z
-    .string()
-    .datetime()
-    .or(z.string().date())
-    .optional(),
+const updateDonorProfileSchema = z
+	.object({
+		bloodGroup: z
+			.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"])
+			.optional(),
 
-  division: z
-    .string()
-    .min(2, "Division is required.")
-    .optional(),
+		dateOfBirth: z.string().trim().optional(),
 
-  district: z
-    .string()
-    .min(2, "District is required.")
-    .optional(),
+		division: z
+			.string()
+			.trim()
+			.min(2, "Division must be at least 2 characters.")
+			.max(100, "Division cannot exceed 100 characters.")
+			.optional(),
 
-  address: z
-    .string()
-    .min(3, "Address is required.")
-    .optional(),
+		district: z
+			.string()
+			.trim()
+			.min(2, "District must be at least 2 characters.")
+			.max(100, "District cannot exceed 100 characters.")
+			.optional(),
 
-  latitude: z
-    .number()
-    .min(-90)
-    .max(90)
-    .optional(),
+		address: z
+			.string()
+			.trim()
+			.min(3, "Address must be at least 3 characters.")
+			.max(500, "Address cannot exceed 500 characters.")
+			.optional(),
 
-  longitude: z
-    .number()
-    .min(-180)
-    .max(180)
-    .optional(),
-});
+		latitude: z
+			.number()
+			.min(-90, "Invalid latitude.")
+			.max(90, "Invalid latitude.")
+			.optional(),
+
+		longitude: z
+			.number()
+			.min(-180, "Invalid longitude.")
+			.max(180, "Invalid longitude.")
+			.optional(),
+	})
+
+	.refine(
+		(data) => {
+			if (!data.dateOfBirth) return true;
+
+			const date = new Date(data.dateOfBirth);
+
+			return !Number.isNaN(date.getTime());
+		},
+		{
+			message: "Invalid date of birth.",
+			path: ["dateOfBirth"],
+		},
+	);
+
+// ======================================================
+// EXPORT
+// ======================================================
 
 export const donorValidation = {
-  updateDonorProfileSchema,
+	updateDonorProfileSchema,
 };

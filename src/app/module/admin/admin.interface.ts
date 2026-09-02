@@ -13,12 +13,17 @@ export interface IGetUsersQuery {
 	search?: string;
 	role?: string;
 	isActive?: string;
-	page?: number;
-	limit?: number;
+	page?: string | number;
+	limit?: string | number;
 }
 
 export interface IUpdateUserStatusPayload {
 	userId: string;
 	adminId: string;
 	isActive: boolean;
+}
+
+export interface IDeleteUserPayload {
+	userId: string;
+	adminId: string;
 }

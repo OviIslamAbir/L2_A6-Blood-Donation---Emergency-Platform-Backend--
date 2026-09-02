@@ -1,7 +1,7 @@
 import path from "path";
 import ejs from "ejs";
 
-import { Role } from "../../../generated/prisma/enums";
+import { Role, DonorApplicationStatus } from "../../../generated/prisma/enums";
 
 import config from "../../config";
 import { prisma } from "../../lib/prisma";
@@ -12,25 +12,30 @@ import type {
 	IRejectDonorPayload,
 	IGetUsersQuery,
 	IUpdateUserStatusPayload,
+	IDeleteUserPayload,
 } from "./admin.interface";
-
-// ======================================================
-// GET ALL DONOR APPLICATIONS
-// ======================================================
 
 const getDonorApplications = async () => {
 	const applications = await prisma.user.findMany({
 		where: {
 			donorApplicationStatus: {
-				in: ["PENDING", "APPROVED", "REJECTED"],
+				in: [
+					DonorApplicationStatus.PENDING,
+					DonorApplicationStatus.APPROVED,
+					DonorApplicationStatus.REJECTED,
+				],
 			},
+			deletedAt: null,
 		},
+
 		include: {
 			donorProfile: true,
 		},
+
 		omit: {
 			password: true,
 		},
+
 		orderBy: {
 			createdAt: "desc",
 		},
@@ -39,22 +44,22 @@ const getDonorApplications = async () => {
 	return applications;
 };
 
-// ======================================================
-// GET PENDING DONOR APPLICATIONS
-// ======================================================
-
 const getPendingDonorApplications = async () => {
 	const applications = await prisma.user.findMany({
 		where: {
 			role: Role.REQUESTER,
-			donorApplicationStatus: "PENDING",
+			donorApplicationStatus: DonorApplicationStatus.PENDING,
+			deletedAt: null,
 		},
+
 		include: {
 			donorProfile: true,
 		},
+
 		omit: {
 			password: true,
 		},
+
 		orderBy: {
 			createdAt: "asc",
 		},
@@ -63,16 +68,12 @@ const getPendingDonorApplications = async () => {
 	return applications;
 };
 
-// ======================================================
-// APPROVE DONOR APPLICATION
-// REQUESTER -> DONOR
-// ======================================================
-
 const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
 		},
+
 		include: {
 			donorProfile: true,
 		},
@@ -82,15 +83,23 @@ const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 		throw new Error("User not found.");
 	}
 
-	if (!user.donorProfile) {
-		throw new Error("No donor application found.");
+	if (user.deletedAt) {
+		throw new Error("This user has been deleted.");
+	}
+
+	if (!user.isActive) {
+		throw new Error("This user account is inactive.");
 	}
 
 	if (user.role !== Role.REQUESTER) {
 		throw new Error("Only requester accounts can be approved as donors.");
 	}
 
-	if (user.donorApplicationStatus !== "PENDING") {
+	if (!user.donorProfile) {
+		throw new Error("No donor application found.");
+	}
+
+	if (user.donorApplicationStatus !== DonorApplicationStatus.PENDING) {
 		throw new Error("This application is not pending.");
 	}
 
@@ -100,30 +109,39 @@ const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 		);
 	}
 
-	const updatedUser = await prisma.user.update({
-		where: {
-			id: user.id,
-		},
-		data: {
-			role: Role.DONOR,
-			donorApplicationStatus: "APPROVED",
-		},
-		omit: {
-			password: true,
-		},
+	const updatedUser = await prisma.$transaction(async (tx) => {
+		const updated = await tx.user.update({
+			where: {
+				id: user.id,
+			},
+
+			data: {
+				role: Role.DONOR,
+
+				donorApplicationStatus: DonorApplicationStatus.APPROVED,
+			},
+
+			omit: {
+				password: true,
+			},
+		});
+
+		await tx.donorProfile.update({
+			where: {
+				userId: user.id,
+			},
+
+			data: {
+				approvedAt: new Date(),
+				rejectedAt: null,
+				rejectReason: null,
+			},
+		});
+
+		return updated;
 	});
 
-	await prisma.donorProfile.update({
-		where: {
-			userId: user.id,
-		},
-		data: {
-			approvedAt: new Date(),
-			rejectedAt: null,
-			rejectReason: null,
-		},
-	});
-
+	// Send approval email
 	try {
 		const templatePath = path.join(
 			process.cwd(),
@@ -141,7 +159,7 @@ const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 			html,
 		});
 	} catch (error) {
-		console.log("Donor approval email failed:", error);
+		console.error("Donor approval email failed:", error);
 	}
 
 	return {
@@ -150,15 +168,12 @@ const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 	};
 };
 
-// ======================================================
-// REJECT DONOR APPLICATION
-// ======================================================
-
 const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
 		},
+
 		include: {
 			donorProfile: true,
 		},
@@ -168,31 +183,50 @@ const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
 		throw new Error("User not found.");
 	}
 
+	if (user.deletedAt) {
+		throw new Error("This user has been deleted.");
+	}
+
+	if (!user.isActive) {
+		throw new Error("This user account is inactive.");
+	}
+
+	if (user.role !== Role.REQUESTER) {
+		throw new Error(
+			"Only requester accounts can have a donor application rejected.",
+		);
+	}
+
 	if (!user.donorProfile) {
 		throw new Error("No donor application found.");
 	}
 
-	if (user.donorApplicationStatus !== "PENDING") {
+	if (user.donorApplicationStatus !== DonorApplicationStatus.PENDING) {
 		throw new Error("This application is not pending.");
 	}
 
-	await prisma.user.update({
-		where: {
-			id: user.id,
-		},
-		data: {
-			donorApplicationStatus: "REJECTED",
-		},
-	});
+	await prisma.$transaction(async (tx) => {
+		await tx.user.update({
+			where: {
+				id: user.id,
+			},
 
-	await prisma.donorProfile.update({
-		where: {
-			userId: user.id,
-		},
-		data: {
-			rejectedAt: new Date(),
-			rejectReason: payload.reason ?? "Not specified",
-		},
+			data: {
+				donorApplicationStatus: DonorApplicationStatus.REJECTED,
+			},
+		});
+
+		await tx.donorProfile.update({
+			where: {
+				userId: user.id,
+			},
+
+			data: {
+				rejectedAt: new Date(),
+				rejectReason: payload.reason || "Not specified",
+				approvedAt: null,
+			},
+		});
 	});
 
 	return {
@@ -200,51 +234,70 @@ const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
 	};
 };
 
-// ======================================================
-// GET ALL USERS
-// ======================================================
-
 const getAllUsers = async (query: IGetUsersQuery) => {
-	const page = Number(query.page) || 1;
-	const limit = Number(query.limit) || 10;
+	const page = Math.max(Number(query.page) || 1, 1);
+
+	const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 100);
 
 	const skip = (page - 1) * limit;
 
-	const where: any = {};
+	const roleFilter =
+		query.role === Role.DONOR ||
+		query.role === Role.REQUESTER ||
+		query.role === Role.ADMIN
+			? query.role
+			: undefined;
 
-	if (query.search) {
-		where.OR = [
-			{
-				name: {
-					contains: query.search,
-					mode: "insensitive",
-				},
-			},
-			{
-				email: {
-					contains: query.search,
-					mode: "insensitive",
-				},
-			},
-		];
-	}
+	const where = {
+		deletedAt: null,
 
-	if (query.role) {
-		where.role = query.role;
-	}
+		...(query.search?.trim()
+			? {
+					OR: [
+						{
+							name: {
+								contains: query.search.trim(),
+								mode: "insensitive" as const,
+							},
+						},
 
-	if (query.isActive !== undefined) {
-		where.isActive = query.isActive === "true";
-	}
+						{
+							email: {
+								contains: query.search.trim(),
+								mode: "insensitive" as const,
+							},
+						},
+					],
+				}
+			: {}),
+
+		...(roleFilter
+			? {
+					role: roleFilter,
+				}
+			: {}),
+
+		...(query.isActive === "true"
+			? {
+					isActive: true,
+				}
+			: query.isActive === "false"
+				? {
+						isActive: false,
+					}
+				: {}),
+	};
 
 	const [users, total] = await Promise.all([
 		prisma.user.findMany({
 			where,
 			skip,
 			take: limit,
+
 			omit: {
 				password: true,
 			},
+
 			orderBy: {
 				createdAt: "desc",
 			},
@@ -262,23 +315,22 @@ const getAllUsers = async (query: IGetUsersQuery) => {
 			total,
 			totalPages: Math.ceil(total / limit),
 		},
+
 		data: users,
 	};
 };
-
-// ======================================================
-// GET SINGLE USER
-// ======================================================
 
 const getSingleUser = async (userId: string) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: userId,
 		},
+
 		include: {
 			donorProfile: true,
 			bloodRequests: true,
 		},
+
 		omit: {
 			password: true,
 		},
@@ -288,12 +340,12 @@ const getSingleUser = async (userId: string) => {
 		throw new Error("User not found.");
 	}
 
+	if (user.deletedAt) {
+		throw new Error("This user has been deleted.");
+	}
+
 	return user;
 };
-
-// ======================================================
-// ACTIVATE / DEACTIVATE USER
-// ======================================================
 
 const updateUserStatus = async (payload: IUpdateUserStatusPayload) => {
 	const user = await prisma.user.findUnique({
@@ -306,17 +358,35 @@ const updateUserStatus = async (payload: IUpdateUserStatusPayload) => {
 		throw new Error("User not found.");
 	}
 
+	if (user.deletedAt) {
+		throw new Error("Deleted users cannot be activated or deactivated.");
+	}
+
 	if (user.role === Role.ADMIN) {
 		throw new Error("Admin accounts cannot be deactivated from this endpoint.");
+	}
+
+	if (user.isActive === payload.isActive) {
+		const { password: _, ...safeUser } = user;
+
+		return {
+			message: payload.isActive
+				? "User is already active."
+				: "User is already inactive.",
+
+			user: safeUser,
+		};
 	}
 
 	const updatedUser = await prisma.user.update({
 		where: {
 			id: user.id,
 		},
+
 		data: {
 			isActive: payload.isActive,
 		},
+
 		omit: {
 			password: true,
 		},
@@ -326,18 +396,15 @@ const updateUserStatus = async (payload: IUpdateUserStatusPayload) => {
 		message: payload.isActive
 			? "User activated successfully."
 			: "User deactivated successfully.",
+
 		user: updatedUser,
 	};
 };
 
-// ======================================================
-// DELETE USER
-// ======================================================
-
-const deleteUser = async (userId: string) => {
+const deleteUser = async (payload: IDeleteUserPayload) => {
 	const user = await prisma.user.findUnique({
 		where: {
-			id: userId,
+			id: payload.userId,
 		},
 	});
 
@@ -349,14 +416,20 @@ const deleteUser = async (userId: string) => {
 		throw new Error("Admin account cannot be deleted.");
 	}
 
+	if (user.deletedAt) {
+		throw new Error("User is already deleted.");
+	}
+
 	const deletedUser = await prisma.user.update({
 		where: {
 			id: user.id,
 		},
+
 		data: {
 			deletedAt: new Date(),
 			isActive: false,
 		},
+
 		omit: {
 			password: true,
 		},
@@ -367,10 +440,6 @@ const deleteUser = async (userId: string) => {
 		user: deletedUser,
 	};
 };
-
-// ======================================================
-// DASHBOARD STATISTICS
-// ======================================================
 
 const getDashboardStats = async () => {
 	const [
@@ -384,53 +453,65 @@ const getDashboardStats = async () => {
 		activeUsers,
 		inactiveUsers,
 	] = await Promise.all([
-		prisma.user.count(),
+		prisma.user.count({
+			where: {
+				deletedAt: null,
+			},
+		}),
 
 		prisma.user.count({
 			where: {
 				role: Role.REQUESTER,
+				deletedAt: null,
 			},
 		}),
 
 		prisma.user.count({
 			where: {
 				role: Role.DONOR,
+				deletedAt: null,
 			},
 		}),
 
 		prisma.user.count({
 			where: {
 				role: Role.ADMIN,
+				deletedAt: null,
 			},
 		}),
 
 		prisma.user.count({
 			where: {
-				donorApplicationStatus: "PENDING",
+				donorApplicationStatus: DonorApplicationStatus.PENDING,
+				deletedAt: null,
 			},
 		}),
 
 		prisma.user.count({
 			where: {
-				donorApplicationStatus: "APPROVED",
+				donorApplicationStatus: DonorApplicationStatus.APPROVED,
+				deletedAt: null,
 			},
 		}),
 
 		prisma.user.count({
 			where: {
-				donorApplicationStatus: "REJECTED",
+				donorApplicationStatus: DonorApplicationStatus.REJECTED,
+				deletedAt: null,
 			},
 		}),
 
 		prisma.user.count({
 			where: {
 				isActive: true,
+				deletedAt: null,
 			},
 		}),
 
 		prisma.user.count({
 			where: {
 				isActive: false,
+				deletedAt: null,
 			},
 		}),
 	]);

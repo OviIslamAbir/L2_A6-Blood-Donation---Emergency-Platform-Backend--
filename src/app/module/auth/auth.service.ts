@@ -6,8 +6,6 @@ import crypto from "crypto";
 import path from "path";
 import ejs from "ejs";
 
-import { BloodGroup, Role } from "../../../generated/prisma/enums";
-
 import config from "../../config";
 import { prisma } from "../../lib/prisma";
 import { googleClient } from "../../lib/googleAuth";
@@ -112,7 +110,6 @@ const registerUser = async (payload: IRegisterUserPayload) => {
 
 const verifyEmail = async (payload: IVerifyEmailPayload) => {
 	const email = payload.email.trim().toLowerCase();
-
 	const otp = payload.otp.trim();
 
 	const existingUser = await prisma.user.findUnique({
@@ -124,7 +121,6 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 	}
 
 	const otpKey = `registration-otp:${email}`;
-
 	const redisOtp = await redisClient.get(otpKey);
 
 	if (!redisOtp) {
@@ -136,7 +132,6 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 	}
 
 	const registrationKey = `registration-data:${email}`;
-
 	const redisUserData = await redisClient.get(registrationKey);
 
 	if (!redisUserData) {
@@ -148,17 +143,13 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 	const createdUser = await prisma.user.create({
 		data: {
 			name: registrationData.name,
-
 			email: registrationData.email,
-
 			password: registrationData.password,
 
-			role: Role.REQUESTER,
+			role: "REQUESTER",
 
 			emailVerified: true,
-
 			isActive: true,
-
 			donorApplicationStatus: "NONE",
 		},
 
@@ -404,7 +395,6 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 	try {
 		const ticket = await googleClient.verifyIdToken({
 			idToken: payload.idToken,
-
 			audience: config.google_client_id,
 		});
 
@@ -425,6 +415,10 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 		throw new Error("Google account name not found.");
 	}
 
+	if (googlePayload.email_verified !== true) {
+		throw new Error("Google email is not verified.");
+	}
+
 	const email = googlePayload.email.trim().toLowerCase();
 
 	let user = await prisma.user.findUnique({
@@ -440,13 +434,13 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 	// ==================================================
 
 	if (user) {
-		if (user.role === Role.DONOR) {
+		if (user.role === "DONOR") {
 			throw new Error(
 				"Donor accounts cannot login with Google. Please use email and password.",
 			);
 		}
 
-		if (user.role === Role.ADMIN) {
+		if (user.role === "ADMIN") {
 			throw new Error("Google login is not available for admin accounts.");
 		}
 
@@ -476,7 +470,6 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 
 				data: {
 					googleId: googlePayload.sub,
-
 					emailVerified: true,
 				},
 
@@ -491,19 +484,20 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 		}
 	}
 
+	// ==================================================
+	// CREATE GOOGLE USER
+	// ==================================================
+
 	if (!user) {
 		user = await prisma.user.create({
 			data: {
 				name: googlePayload.name,
-
 				email,
 
-				role: Role.REQUESTER,
+				role: "REQUESTER",
 
 				googleId: googlePayload.sub,
-
 				emailVerified: true,
-
 				isActive: true,
 
 				donorApplicationStatus: "NONE",
@@ -525,11 +519,8 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 
 		await transporter.sendMail({
 			from: config.email_sender,
-
 			to: user.email,
-
 			subject: "Welcome To Blood Donation Platform",
-
 			html,
 		});
 	}
@@ -716,11 +707,8 @@ const resetPassword = async (payload: IResetPasswordPayload) => {
 
 	await transporter.sendMail({
 		from: config.email_sender,
-
 		to: user.email,
-
 		subject: "Password Changed Successfully",
-
 		html,
 	});
 
@@ -733,11 +721,13 @@ const resetPassword = async (payload: IResetPasswordPayload) => {
 // APPLY FOR DONOR
 // REQUESTER -> PENDING
 // ======================================================
+
 const applyForDonor = async (payload: IDonorApplicationPayload) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
 		},
+
 		include: {
 			donorProfile: true,
 		},
@@ -751,31 +741,35 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 		throw new Error("Your account is inactive.");
 	}
 
+	if (user.deletedAt) {
+		throw new Error("Your account has been deleted.");
+	}
+
 	if (!user.emailVerified) {
 		throw new Error("Please verify your email first.");
 	}
 
-	if (user.role === Role.DONOR) {
-		throw new Error("You are already a donor.");
+	if (user.role !== "REQUESTER") {
+		if (user.role === "DONOR") {
+			throw new Error("You are already a donor.");
+		}
+
+		throw new Error("Only requester accounts can apply for donor.");
 	}
 
 	if (user.donorApplicationStatus === "PENDING") {
 		throw new Error("Your donor application is already pending review.");
 	}
 
-	// ======================================================
-	// BLOOD GROUP CONVERSION
-	// ======================================================
-
-	const bloodGroupMap: Record<string, BloodGroup> = {
-		"A+": BloodGroup.A_POSITIVE,
-		"A-": BloodGroup.A_NEGATIVE,
-		"B+": BloodGroup.B_POSITIVE,
-		"B-": BloodGroup.B_NEGATIVE,
-		"AB+": BloodGroup.AB_POSITIVE,
-		"AB-": BloodGroup.AB_NEGATIVE,
-		"O+": BloodGroup.O_POSITIVE,
-		"O-": BloodGroup.O_NEGATIVE,
+	const bloodGroupMap: Record<string, string> = {
+		"A+": "A_POSITIVE",
+		"A-": "A_NEGATIVE",
+		"B+": "B_POSITIVE",
+		"B-": "B_NEGATIVE",
+		"AB+": "AB_POSITIVE",
+		"AB-": "AB_NEGATIVE",
+		"O+": "O_POSITIVE",
+		"O-": "O_NEGATIVE",
 	};
 
 	const bloodGroup = bloodGroupMap[payload.bloodGroup];
@@ -786,6 +780,16 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 		);
 	}
 
+	let dateOfBirth: Date | undefined;
+
+	if (payload.dateOfBirth) {
+		dateOfBirth = new Date(payload.dateOfBirth);
+
+		if (Number.isNaN(dateOfBirth.getTime())) {
+			throw new Error("Invalid date of birth.");
+		}
+	}
+
 	await prisma.donorProfile.upsert({
 		where: {
 			userId: user.id,
@@ -794,11 +798,9 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 		create: {
 			userId: user.id,
 
-			bloodGroup,
+			bloodGroup: bloodGroup as any,
 
-			dateOfBirth: payload.dateOfBirth
-				? new Date(payload.dateOfBirth)
-				: undefined,
+			dateOfBirth,
 
 			division: payload.division,
 			district: payload.district,
@@ -813,11 +815,9 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 		},
 
 		update: {
-			bloodGroup,
+			bloodGroup: bloodGroup as any,
 
-			dateOfBirth: payload.dateOfBirth
-				? new Date(payload.dateOfBirth)
-				: undefined,
+			dateOfBirth,
 
 			division: payload.division,
 			district: payload.district,

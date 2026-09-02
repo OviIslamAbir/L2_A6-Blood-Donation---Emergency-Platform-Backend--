@@ -3,7 +3,7 @@ model AuditLog {
 
   userId      String?
 
-  user        User? @relation(fields: [userId],references: [id])
+  user        User? @relation( fields: [userId],references: [id] )
 
   action      String
   entity      String

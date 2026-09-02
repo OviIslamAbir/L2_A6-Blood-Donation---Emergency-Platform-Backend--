@@ -1,6 +1,21 @@
 import z from "zod";
 
 // ======================================================
+// BLOOD GROUP
+// ======================================================
+
+const bloodGroupSchema = z.enum([
+	"A+",
+	"A-",
+	"B+",
+	"B-",
+	"AB+",
+	"AB-",
+	"O+",
+	"O-",
+]);
+
+// ======================================================
 // REGISTER USER
 // Always creates REQUESTER
 // ======================================================
@@ -8,6 +23,7 @@ import z from "zod";
 const registerUserSchema = z.object({
 	name: z
 		.string()
+		.trim()
 		.min(3, {
 			message: "Name must be at least 3 characters long",
 		})
@@ -84,7 +100,7 @@ const loginUserSchema = z.object({
 // ======================================================
 
 const googleLoginSchema = z.object({
-	idToken: z.string().min(1, {
+	idToken: z.string().trim().min(1, {
 		message: "Google ID token is required",
 	}),
 });
@@ -144,27 +160,83 @@ const resetPasswordSchema = z.object({
 // ======================================================
 
 const donorApplicationSchema = z.object({
-	bloodGroup: z.string().min(1, {
-		message: "Blood group is required",
-	}),
+	// ------------------------------
+	// Blood Group
+	// ------------------------------
+
+	bloodGroup: bloodGroupSchema,
+
+	// ------------------------------
+	// Date of Birth
+	// ------------------------------
 
 	dateOfBirth: z.string().optional(),
 
-	division: z.string().min(1, {
-		message: "Division is required",
-	}),
+	// ------------------------------
+	// Division
+	// ------------------------------
 
-	district: z.string().min(1, {
-		message: "District is required",
-	}),
+	division: z
+		.string()
+		.trim()
+		.min(2, {
+			message: "Division is required",
+		})
+		.max(100, {
+			message: "Division cannot exceed 100 characters",
+		}),
 
-	address: z.string().min(1, {
-		message: "Address is required",
-	}),
+	// ------------------------------
+	// District
+	// ------------------------------
 
-	latitude: z.number().optional(),
+	district: z
+		.string()
+		.trim()
+		.min(2, {
+			message: "District is required",
+		})
+		.max(100, {
+			message: "District cannot exceed 100 characters",
+		}),
 
-	longitude: z.number().optional(),
+	// ------------------------------
+	// Address
+	// ------------------------------
+
+	address: z
+		.string()
+		.trim()
+		.min(3, {
+			message: "Address is required",
+		})
+		.max(500, {
+			message: "Address cannot exceed 500 characters",
+		}),
+
+	// ------------------------------
+	// Location
+	// ------------------------------
+
+	latitude: z
+		.number()
+		.min(-90, {
+			message: "Latitude must be between -90 and 90",
+		})
+		.max(90, {
+			message: "Latitude must be between -90 and 90",
+		})
+		.optional(),
+
+	longitude: z
+		.number()
+		.min(-180, {
+			message: "Longitude must be between -180 and 180",
+		})
+		.max(180, {
+			message: "Longitude must be between -180 and 180",
+		})
+		.optional(),
 });
 
 // ======================================================

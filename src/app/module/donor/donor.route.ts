@@ -4,68 +4,72 @@ import { DonorController } from "./donor.controller";
 import { donorValidation } from "./donor.validation";
 
 import { auth } from "../../middleware/checkAuth";
-
-import { Role } from "../../../generated/prisma/enums";
 import { validateRequest } from "../../middleware/validateRequest";
 
-
 const router = Router();
-
 
 // ======================================================
 // DONOR PROFILE
 // ======================================================
 
+router.get("/profile", auth("DONOR"), DonorController.getDonorProfile);
+
+// ======================================================
+// APPLICATION STATUS
+// ======================================================
+
+// REQUESTER / DONOR উভয়েই নিজের application status দেখতে পারবে
 router.get(
-  "/profile",
-  auth(Role.DONOR),
-  DonorController.getDonorProfile,
+	"/application-status",
+	auth(),
+	DonorController.getDonorApplicationStatus,
 );
 
+// ======================================================
+// UPDATE DONOR PROFILE
+// ======================================================
 
-router.get(
-  "/application-status",
-  auth(Role.DONOR),
-  DonorController.getDonorApplicationStatus,
-);
 router.patch(
-  "/profile",
-  auth(Role.DONOR),
-  validateRequest(
-    donorValidation.updateDonorProfileSchema,
-  ),
-  DonorController.updateDonorProfile,
+	"/profile",
+	auth("DONOR"),
+	validateRequest(donorValidation.updateDonorProfileSchema),
+	DonorController.updateDonorProfile,
 );
+
 // ======================================================
 // NOTIFICATIONS
 // ======================================================
 
-router.get(
-  "/notifications",
-  auth(Role.DONOR),
-  DonorController.getMyNotifications,
-);
-
+router.get("/notifications", auth("DONOR"), DonorController.getMyNotifications);
 
 router.get(
-  "/notifications/unread-count",
-  auth(Role.DONOR),
-  DonorController.getUnreadNotificationCount,
+	"/notifications/unread-count",
+	auth("DONOR"),
+	DonorController.getUnreadNotificationCount,
 );
 
+// ======================================================
+// MARK ALL READ
+// ======================================================
 
 router.patch(
-  "/notifications/read-all",
-  auth(Role.DONOR),
-  DonorController.markAllNotificationsAsRead,
+	"/notifications/read-all",
+	auth("DONOR"),
+	DonorController.markAllNotificationsAsRead,
 );
 
+// ======================================================
+// MARK ONE READ
+// ======================================================
 
 router.patch(
-  "/notifications/:notificationId/read",
-  auth(Role.DONOR),
-  DonorController.markNotificationAsRead,
+	"/notifications/:notificationId/read",
+	auth("DONOR"),
+	DonorController.markNotificationAsRead,
 );
-  
+
+// ======================================================
+// EXPORT
+// ======================================================
 
 export const DonorRoutes = router;

@@ -14,57 +14,82 @@ const router = Router();
 // PUBLIC ROUTES
 // ======================================================
 
-// Register -> REQUESTER
+// Register
+// New users are created as REQUESTER
+
 router.post(
 	"/register",
 	validateRequest(userValidation.registerUserSchema),
 	AuthController.registerUser,
 );
 
-// Verify email
+// ======================================================
+// VERIFY EMAIL
+// ======================================================
+
 router.post(
 	"/verify-email",
 	validateRequest(userValidation.verifyEmailSchema),
 	AuthController.verifyEmail,
 );
 
-// Email + password login
+// ======================================================
+// LOGIN
+// ======================================================
+
 router.post(
 	"/login",
 	validateRequest(userValidation.loginUserSchema),
 	AuthController.loginUser,
 );
 
-// Google login
+// ======================================================
+// GOOGLE LOGIN
+// ======================================================
+
 router.post(
 	"/google",
 	validateRequest(userValidation.googleLoginSchema),
 	AuthController.googleLogin,
 );
 
-// Forgot password
+// ======================================================
+// FORGOT PASSWORD
+// ======================================================
+
 router.post(
 	"/forgot-password",
 	validateRequest(userValidation.forgotPasswordSchema),
 	AuthController.forgotPassword,
 );
 
-// Reset password
+// ======================================================
+// RESET PASSWORD
+// ======================================================
+
 router.post(
 	"/reset-password",
 	validateRequest(userValidation.resetPasswordSchema),
 	AuthController.resetPassword,
 );
 
-// Refresh token
+// ======================================================
+// REFRESH TOKEN
+// ======================================================
+
 router.post("/refresh-token", AuthController.refreshToken);
 
-// Logout
+// ======================================================
+// LOGOUT
+// ======================================================
+
 router.post("/logout", AuthController.logoutUser);
 
 // ======================================================
 // PROTECTED ROUTES
 // ======================================================
+
+// Current logged-in user
 
 router.get(
 	"/me",

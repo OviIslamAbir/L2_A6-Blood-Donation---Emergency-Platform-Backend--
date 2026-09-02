@@ -1,12 +1,10 @@
 import type { Request, Response } from "express";
-
 import httpStatus from "http-status";
 
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 
 import type { IRequestUser } from "./auth.interface";
-
 import { AuthService } from "./auth.service";
 
 // ======================================================
@@ -19,14 +17,14 @@ const accessCookieOptions = {
 	httpOnly: true,
 	secure: isProduction,
 	sameSite: isProduction ? ("none" as const) : ("lax" as const),
-	maxAge: 1000 * 60 * 60 * 24,
+	maxAge: 1000 * 60 * 60 * 24, // 1 day
 };
 
 const refreshCookieOptions = {
 	httpOnly: true,
 	secure: isProduction,
 	sameSite: isProduction ? ("none" as const) : ("lax" as const),
-	maxAge: 1000 * 60 * 60 * 24 * 7,
+	maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
 };
 
 // ======================================================
@@ -55,7 +53,6 @@ const verifyEmail = catchAsync(async (req: Request, res: Response) => {
 	const { accessToken, refreshToken, user } = result;
 
 	res.cookie("accessToken", accessToken, accessCookieOptions);
-
 	res.cookie("refreshToken", refreshToken, refreshCookieOptions);
 
 	sendResponse(res, {
@@ -80,7 +77,6 @@ const loginUser = catchAsync(async (req: Request, res: Response) => {
 	const { accessToken, refreshToken, user } = result;
 
 	res.cookie("accessToken", accessToken, accessCookieOptions);
-
 	res.cookie("refreshToken", refreshToken, refreshCookieOptions);
 
 	sendResponse(res, {
@@ -132,7 +128,6 @@ const refreshToken = catchAsync(async (req: Request, res: Response) => {
 	const { accessToken, refreshToken: newRefreshToken } = result;
 
 	res.cookie("accessToken", accessToken, accessCookieOptions);
-
 	res.cookie("refreshToken", newRefreshToken, refreshCookieOptions);
 
 	sendResponse(res, {
@@ -156,7 +151,6 @@ const googleLogin = catchAsync(async (req: Request, res: Response) => {
 	const { accessToken, refreshToken, user } = result;
 
 	res.cookie("accessToken", accessToken, accessCookieOptions);
-
 	res.cookie("refreshToken", refreshToken, refreshCookieOptions);
 
 	sendResponse(res, {
@@ -207,7 +201,6 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 
 const logoutUser = catchAsync(async (_req: Request, res: Response) => {
 	res.clearCookie("accessToken", accessCookieOptions);
-
 	res.clearCookie("refreshToken", refreshCookieOptions);
 
 	sendResponse(res, {
@@ -220,6 +213,7 @@ const logoutUser = catchAsync(async (_req: Request, res: Response) => {
 
 // ======================================================
 // APPLY FOR DONOR
+// REQUESTER ONLY
 // ======================================================
 
 const applyForDonor = catchAsync(async (req: Request, res: Response) => {

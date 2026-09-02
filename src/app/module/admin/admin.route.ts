@@ -1,6 +1,5 @@
 import { Router } from "express";
 
-import { Role } from "../../../generated/prisma/enums";
 import { auth } from "../../middleware/checkAuth";
 import { validateRequest } from "../../middleware/validateRequest";
 
@@ -13,7 +12,7 @@ const router = Router();
 // DASHBOARD
 // ======================================================
 
-router.get("/dashboard", auth(Role.ADMIN), AdminController.getDashboardStats);
+router.get("/dashboard", auth("ADMIN"), AdminController.getDashboardStats);
 
 // ======================================================
 // DONOR APPLICATIONS
@@ -21,13 +20,13 @@ router.get("/dashboard", auth(Role.ADMIN), AdminController.getDashboardStats);
 
 router.get(
 	"/donor-applications",
-	auth(Role.ADMIN),
+	auth("ADMIN"),
 	AdminController.getDonorApplications,
 );
 
 router.get(
 	"/donor-applications/pending",
-	auth(Role.ADMIN),
+	auth("ADMIN"),
 	AdminController.getPendingDonorApplications,
 );
 
@@ -37,7 +36,7 @@ router.get(
 
 router.patch(
 	"/donor/:userId/approve",
-	auth(Role.ADMIN),
+	auth("ADMIN"),
 	AdminController.approveDonorApplication,
 );
 
@@ -47,7 +46,7 @@ router.patch(
 
 router.patch(
 	"/donor/:userId/reject",
-	auth(Role.ADMIN),
+	auth("ADMIN"),
 	validateRequest(adminValidation.rejectDonorSchema),
 	AdminController.rejectDonorApplication,
 );
@@ -56,17 +55,17 @@ router.patch(
 // USERS
 // ======================================================
 
-router.get("/users", auth(Role.ADMIN), AdminController.getAllUsers);
+router.get("/users", auth("ADMIN"), AdminController.getAllUsers);
 
-router.get("/users/:userId", auth(Role.ADMIN), AdminController.getSingleUser);
+router.get("/users/:userId", auth("ADMIN"), AdminController.getSingleUser);
 
 // ======================================================
-// ACTIVATE / DEACTIVATE USER
+// ACTIVATE / DEACTIVATE
 // ======================================================
 
 router.patch(
 	"/users/:userId/status",
-	auth(Role.ADMIN),
+	auth("ADMIN"),
 	validateRequest(adminValidation.updateUserStatusSchema),
 	AdminController.updateUserStatus,
 );
@@ -75,6 +74,10 @@ router.patch(
 // DELETE USER
 // ======================================================
 
-router.delete("/users/:userId", auth(Role.ADMIN), AdminController.deleteUser);
+router.delete("/users/:userId", auth("ADMIN"), AdminController.deleteUser);
+
+// ======================================================
+// EXPORT
+// ======================================================
 
 export const AdminRoutes = router;

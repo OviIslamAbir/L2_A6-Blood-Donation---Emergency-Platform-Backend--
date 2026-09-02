@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import { AdminService } from "./admin.service";
@@ -7,7 +8,7 @@ import { AdminService } from "./admin.service";
 // DASHBOARD
 // ======================================================
 
-const getDashboardStats = catchAsync(async (req: Request, res: Response) => {
+const getDashboardStats = catchAsync(async (_req: Request, res: Response) => {
 	const result = await AdminService.getDashboardStats();
 
 	sendResponse(res, {
@@ -22,23 +23,25 @@ const getDashboardStats = catchAsync(async (req: Request, res: Response) => {
 // ALL DONOR APPLICATIONS
 // ======================================================
 
-const getDonorApplications = catchAsync(async (req: Request, res: Response) => {
-	const result = await AdminService.getDonorApplications();
+const getDonorApplications = catchAsync(
+	async (_req: Request, res: Response) => {
+		const result = await AdminService.getDonorApplications();
 
-	sendResponse(res, {
-		statusCode: 200,
-		success: true,
-		message: "Donor applications retrieved successfully.",
-		data: result,
-	});
-});
+		sendResponse(res, {
+			statusCode: 200,
+			success: true,
+			message: "Donor applications retrieved successfully.",
+			data: result,
+		});
+	},
+);
 
 // ======================================================
-// PENDING APPLICATIONS
+// PENDING DONOR APPLICATIONS
 // ======================================================
 
 const getPendingDonorApplications = catchAsync(
-	async (req: Request, res: Response) => {
+	async (_req: Request, res: Response) => {
 		const result = await AdminService.getPendingDonorApplications();
 
 		sendResponse(res, {
@@ -61,7 +64,7 @@ const approveDonorApplication = catchAsync(
 		}
 
 		const result = await AdminService.approveDonorApplication({
-			userId: req.params.userId as string,
+			userId: String(req.params.userId),
 			adminId: req.user.userId,
 		});
 
@@ -85,7 +88,7 @@ const rejectDonorApplication = catchAsync(
 		}
 
 		const result = await AdminService.rejectDonorApplication({
-			userId: req.params.userId as string,
+			userId: String(req.params.userId),
 			adminId: req.user.userId,
 			reason: req.body?.reason,
 		});
@@ -119,7 +122,7 @@ const getAllUsers = catchAsync(async (req: Request, res: Response) => {
 // ======================================================
 
 const getSingleUser = catchAsync(async (req: Request, res: Response) => {
-	const result = await AdminService.getSingleUser(req.params.userId as string);
+	const result = await AdminService.getSingleUser(String(req.params.userId));
 
 	sendResponse(res, {
 		statusCode: 200,
@@ -139,7 +142,7 @@ const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
 	}
 
 	const result = await AdminService.updateUserStatus({
-		userId: req.params.userId as string,
+		userId: String(req.params.userId),
 		adminId: req.user.userId,
 		isActive: req.body.isActive,
 	});
@@ -157,7 +160,14 @@ const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
 // ======================================================
 
 const deleteUser = catchAsync(async (req: Request, res: Response) => {
-	const result = await AdminService.deleteUser(req.params.userId as string);
+	if (!req.user) {
+		throw new Error("User information is missing in the request.");
+	}
+
+	const result = await AdminService.deleteUser({
+		userId: String(req.params.userId),
+		adminId: req.user.userId,
+	});
 
 	sendResponse(res, {
 		statusCode: 200,
@@ -166,6 +176,10 @@ const deleteUser = catchAsync(async (req: Request, res: Response) => {
 		data: result.user,
 	});
 });
+
+// ======================================================
+// EXPORT
+// ======================================================
 
 export const AdminController = {
 	getDashboardStats,
