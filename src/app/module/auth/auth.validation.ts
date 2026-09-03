@@ -16,6 +16,14 @@ const bloodGroupSchema = z.enum([
 ]);
 
 // ======================================================
+// REQUESTER TYPE
+// ======================================================
+
+const requesterTypeSchema = z.enum(["PATIENT", "HOSPITAL"], {
+	message: "Requester type must be either PATIENT or HOSPITAL",
+});
+
+// ======================================================
 // REGISTER USER
 // Always creates REQUESTER
 // ======================================================
@@ -55,6 +63,12 @@ const registerUserSchema = z.object({
 		.regex(/[^A-Za-z0-9]/, {
 			message: "Password must contain at least one special character",
 		}),
+
+	// ==================================================
+	// PATIENT / HOSPITAL
+	// ==================================================
+
+	requesterType: requesterTypeSchema,
 });
 
 // ======================================================
@@ -160,21 +174,9 @@ const resetPasswordSchema = z.object({
 // ======================================================
 
 const donorApplicationSchema = z.object({
-	// ------------------------------
-	// Blood Group
-	// ------------------------------
-
 	bloodGroup: bloodGroupSchema,
 
-	// ------------------------------
-	// Date of Birth
-	// ------------------------------
-
 	dateOfBirth: z.string().optional(),
-
-	// ------------------------------
-	// Division
-	// ------------------------------
 
 	division: z
 		.string()
@@ -186,10 +188,6 @@ const donorApplicationSchema = z.object({
 			message: "Division cannot exceed 100 characters",
 		}),
 
-	// ------------------------------
-	// District
-	// ------------------------------
-
 	district: z
 		.string()
 		.trim()
@@ -200,10 +198,6 @@ const donorApplicationSchema = z.object({
 			message: "District cannot exceed 100 characters",
 		}),
 
-	// ------------------------------
-	// Address
-	// ------------------------------
-
 	address: z
 		.string()
 		.trim()
@@ -213,10 +207,6 @@ const donorApplicationSchema = z.object({
 		.max(500, {
 			message: "Address cannot exceed 500 characters",
 		}),
-
-	// ------------------------------
-	// Location
-	// ------------------------------
 
 	latitude: z
 		.number()

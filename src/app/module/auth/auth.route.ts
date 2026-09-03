@@ -14,8 +14,9 @@ const router = Router();
 // PUBLIC ROUTES
 // ======================================================
 
-// Register
-// New users are created as REQUESTER
+// ======================================================
+// REGISTER
+// ======================================================
 
 router.post(
 	"/register",
@@ -77,28 +78,40 @@ router.post(
 // REFRESH TOKEN
 // ======================================================
 
-router.post("/refresh-token", AuthController.refreshToken);
+router.post(
+	"/refresh-token",
+	AuthController.refreshToken,
+);
 
 // ======================================================
 // LOGOUT
 // ======================================================
 
-router.post("/logout", AuthController.logoutUser);
+router.post(
+	"/logout",
+	AuthController.logoutUser,
+);
 
 // ======================================================
 // PROTECTED ROUTES
 // ======================================================
 
-// Current logged-in user
+// ======================================================
+// CURRENT LOGGED-IN USER
+// ======================================================
 
 router.get(
 	"/me",
-	auth(Role.REQUESTER, Role.DONOR, Role.ADMIN),
+	auth(
+		Role.REQUESTER,
+		Role.DONOR,
+		Role.ADMIN,
+	),
 	AuthController.getMe,
 );
 
 // ======================================================
-// DONOR APPLICATION
+// APPLY FOR DONOR
 // REQUESTER ONLY
 // ======================================================
 

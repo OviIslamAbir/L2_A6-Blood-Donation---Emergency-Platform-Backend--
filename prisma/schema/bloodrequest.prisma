@@ -18,6 +18,8 @@ model BloodRequest {
   latitude        Decimal?
   longitude       Decimal?
 
+  requesterType   RequesterType
+
   urgency         Urgency @default(NORMAL)
 
   status          RequestStatus @default(PENDING)

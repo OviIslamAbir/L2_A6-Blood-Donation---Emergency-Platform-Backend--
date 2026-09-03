@@ -17,14 +17,14 @@ const accessCookieOptions = {
 	httpOnly: true,
 	secure: isProduction,
 	sameSite: isProduction ? ("none" as const) : ("lax" as const),
-	maxAge: 1000 * 60 * 60 * 24, // 1 day
+	maxAge: 1000 * 60 * 60 * 24,
 };
 
 const refreshCookieOptions = {
 	httpOnly: true,
 	secure: isProduction,
 	sameSite: isProduction ? ("none" as const) : ("lax" as const),
-	maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+	maxAge: 1000 * 60 * 60 * 24 * 7,
 };
 
 // ======================================================
@@ -58,7 +58,8 @@ const verifyEmail = catchAsync(async (req: Request, res: Response) => {
 	sendResponse(res, {
 		statusCode: httpStatus.OK,
 		success: true,
-		message: "Email verified successfully. Your account has been created.",
+		message:
+			"Email verified successfully. Your account has been created.",
 		data: {
 			user,
 			accessToken,
@@ -125,10 +126,22 @@ const refreshToken = catchAsync(async (req: Request, res: Response) => {
 
 	const result = await AuthService.refreshToken(token);
 
-	const { accessToken, refreshToken: newRefreshToken } = result;
+	const {
+		accessToken,
+		refreshToken: newRefreshToken,
+	} = result;
 
-	res.cookie("accessToken", accessToken, accessCookieOptions);
-	res.cookie("refreshToken", newRefreshToken, refreshCookieOptions);
+	res.cookie(
+		"accessToken",
+		accessToken,
+		accessCookieOptions,
+	);
+
+	res.cookie(
+		"refreshToken",
+		newRefreshToken,
+		refreshCookieOptions,
+	);
 
 	sendResponse(res, {
 		statusCode: httpStatus.OK,
@@ -150,8 +163,17 @@ const googleLogin = catchAsync(async (req: Request, res: Response) => {
 
 	const { accessToken, refreshToken, user } = result;
 
-	res.cookie("accessToken", accessToken, accessCookieOptions);
-	res.cookie("refreshToken", refreshToken, refreshCookieOptions);
+	res.cookie(
+		"accessToken",
+		accessToken,
+		accessCookieOptions,
+	);
+
+	res.cookie(
+		"refreshToken",
+		refreshToken,
+		refreshCookieOptions,
+	);
 
 	sendResponse(res, {
 		statusCode: httpStatus.OK,
@@ -200,8 +222,15 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 // ======================================================
 
 const logoutUser = catchAsync(async (_req: Request, res: Response) => {
-	res.clearCookie("accessToken", accessCookieOptions);
-	res.clearCookie("refreshToken", refreshCookieOptions);
+	res.clearCookie(
+		"accessToken",
+		accessCookieOptions,
+	);
+
+	res.clearCookie(
+		"refreshToken",
+		refreshCookieOptions,
+	);
 
 	sendResponse(res, {
 		statusCode: httpStatus.OK,

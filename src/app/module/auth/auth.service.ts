@@ -30,7 +30,11 @@ import type {
 // ======================================================
 
 const registerUser = async (payload: IRegisterUserPayload) => {
-	const { name, password } = payload;
+	const {
+		name,
+		password,
+		requesterType,
+	} = payload;
 
 	const email = payload.email.trim().toLowerCase();
 
@@ -53,6 +57,10 @@ const registerUser = async (payload: IRegisterUserPayload) => {
 		Number(config.bcrypt_salt_rounds) || 10,
 	);
 
+	// ==================================================
+	// OTP
+	// ==================================================
+
 	const otpKey = `registration-otp:${email}`;
 
 	const otp = crypto.randomInt(100000, 1000000).toString();
@@ -64,20 +72,33 @@ const registerUser = async (payload: IRegisterUserPayload) => {
 		},
 	});
 
+	// ==================================================
+	// REGISTRATION DATA
+	// ==================================================
+
 	const registrationKey = `registration-data:${email}`;
 
 	const registrationData = {
 		name,
 		email,
 		password: hashedPassword,
+		requesterType,
 	};
 
-	await redisClient.set(registrationKey, JSON.stringify(registrationData), {
-		expiration: {
-			type: "EX",
-			value: 5 * 60,
+	await redisClient.set(
+		registrationKey,
+		JSON.stringify(registrationData),
+		{
+			expiration: {
+				type: "EX",
+				value: 5 * 60,
+			},
 		},
-	});
+	);
+
+	// ==================================================
+	// SEND OTP EMAIL
+	// ==================================================
 
 	const templatePath = path.join(
 		process.cwd(),
@@ -100,6 +121,7 @@ const registerUser = async (payload: IRegisterUserPayload) => {
 
 	return {
 		email,
+		requesterType,
 		message: "Registration initiated. Please verify your email.",
 	};
 };
@@ -120,7 +142,12 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 		throw new Error("Email is already verified.");
 	}
 
+	// ==================================================
+	// CHECK OTP
+	// ==================================================
+
 	const otpKey = `registration-otp:${email}`;
+
 	const redisOtp = await redisClient.get(otpKey);
 
 	if (!redisOtp) {
@@ -131,14 +158,28 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 		throw new Error("Invalid OTP.");
 	}
 
+	// ==================================================
+	// GET REGISTRATION DATA
+	// ==================================================
+
 	const registrationKey = `registration-data:${email}`;
+
 	const redisUserData = await redisClient.get(registrationKey);
 
 	if (!redisUserData) {
 		throw new Error("Registration data expired. Please register again.");
 	}
 
-	const registrationData = JSON.parse(redisUserData);
+	const registrationData = JSON.parse(redisUserData) as {
+		name: string;
+		email: string;
+		password: string;
+		requesterType: "PATIENT" | "HOSPITAL";
+	};
+
+	// ==================================================
+	// CREATE USER
+	// ==================================================
 
 	const createdUser = await prisma.user.create({
 		data: {
@@ -147,6 +188,9 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 			password: registrationData.password,
 
 			role: "REQUESTER",
+
+			// IMPORTANT
+			requesterType: registrationData.requesterType,
 
 			emailVerified: true,
 			isActive: true,
@@ -158,7 +202,18 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 		},
 	});
 
-	await redisClient.del([otpKey, registrationKey]);
+	// ==================================================
+	// DELETE REDIS DATA
+	// ==================================================
+
+	await redisClient.del([
+		otpKey,
+		registrationKey,
+	]);
+
+	// ==================================================
+	// WELCOME EMAIL
+	// ==================================================
 
 	const templatePath = path.join(
 		process.cwd(),
@@ -175,6 +230,10 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 		subject: "Welcome To Blood Donation Platform",
 		html,
 	});
+
+	// ==================================================
+	// JWT
+	// ==================================================
 
 	const jwtPayload = {
 		userId: createdUser.id,
@@ -242,7 +301,10 @@ const loginUser = async (payload: ILoginUserPayload) => {
 		throw new Error("Password login is not available for this account.");
 	}
 
-	const passwordMatched = await bcrypt.compare(payload.password, user.password);
+	const passwordMatched = await bcrypt.compare(
+		payload.password,
+		user.password,
+	);
 
 	if (!passwordMatched) {
 		throw new Error("Invalid email or password.");
@@ -441,7 +503,9 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 		}
 
 		if (user.role === "ADMIN") {
-			throw new Error("Google login is not available for admin accounts.");
+			throw new Error(
+				"Google login is not available for admin accounts.",
+			);
 		}
 
 		if (!user.isActive) {
@@ -477,7 +541,10 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 					donorProfile: true,
 				},
 			});
-		} else if (user.googleId && user.googleId !== googlePayload.sub) {
+		} else if (
+			user.googleId &&
+			user.googleId !== googlePayload.sub
+		) {
 			throw new Error(
 				"This email is already connected to another Google account.",
 			);
@@ -499,6 +566,10 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 				googleId: googlePayload.sub,
 				emailVerified: true,
 				isActive: true,
+
+				// Google registration does not know
+				// whether user is PATIENT or HOSPITAL.
+				requesterType: null,
 
 				donorApplicationStatus: "NONE",
 			},
@@ -593,7 +664,9 @@ const forgotPassword = async (payload: IForgotPasswordPayload) => {
 	}
 
 	if (!user.password) {
-		throw new Error("Password reset is not available for this account.");
+		throw new Error(
+			"Password reset is not available for this account.",
+		);
 	}
 
 	const otp = crypto.randomInt(100000, 1000000).toString();
@@ -758,7 +831,9 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 	}
 
 	if (user.donorApplicationStatus === "PENDING") {
-		throw new Error("Your donor application is already pending review.");
+		throw new Error(
+			"Your donor application is already pending review.",
+		);
 	}
 
 	const bloodGroupMap: Record<string, string> = {

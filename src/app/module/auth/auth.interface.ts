@@ -1,22 +1,18 @@
-import type { BloodGroup, Role } from "../../../generated/prisma/browser";
-
 // ======================================================
-// LOGIN
+// REQUESTER TYPE
 // ======================================================
 
-export interface ILoginUserPayload {
-	email: string;
-	password: string;
-}
+export type RequesterType = "PATIENT" | "HOSPITAL";
 
 // ======================================================
-// REGISTER
+// REGISTER USER
 // ======================================================
 
 export interface IRegisterUserPayload {
 	name: string;
 	email: string;
 	password: string;
+	requesterType: RequesterType;
 }
 
 // ======================================================
@@ -29,15 +25,12 @@ export interface IVerifyEmailPayload {
 }
 
 // ======================================================
-// REQUEST USER
-// JWT USER
+// LOGIN
 // ======================================================
 
-export interface IRequestUser {
-	userId: string;
+export interface ILoginUserPayload {
 	email: string;
-	name: string;
-	role: Role;
+	password: string;
 }
 
 // ======================================================
@@ -72,18 +65,22 @@ export interface IResetPasswordPayload {
 
 export interface IDonorApplicationPayload {
 	userId: string;
-
-	bloodGroup: BloodGroup;
-
+	bloodGroup: string;
 	dateOfBirth?: string;
-
-	division?: string;
-
-	district?: string;
-
-	address?: string;
-
+	division: string;
+	district: string;
+	address: string;
 	latitude?: number;
-
 	longitude?: number;
+}
+
+// ======================================================
+// REQUEST USER
+// ======================================================
+
+export interface IRequestUser {
+	userId: string;
+	name: string;
+	email: string;
+	role: string;
 }
