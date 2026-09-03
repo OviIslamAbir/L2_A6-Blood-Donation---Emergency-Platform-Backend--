@@ -13,6 +13,7 @@ import { AuthRoutes } from "./app/module/auth/auth.route";
 import { AdminRoutes } from "./app/module/admin/admin.route";
 import { DonorRoutes } from "./app/module/donor/donor.route";
 import { BloodRequestRoutes } from "./app/module/bloodReq/bloodReq.route";
+import { DonorMatchRoutes } from "./app/module/donorMatch/donorMatch.route";
 
 const app: Application = express();
 
@@ -34,6 +35,7 @@ app.use("/api/v1/auth", AuthRoutes);
 app.use("/api/v1/admin", AdminRoutes);
 app.use("/api/v1/donor", DonorRoutes);
 app.use("/api/v1/blood-requests", BloodRequestRoutes);
+app.use("/api/v1/donor-matches", DonorMatchRoutes);
 // Basic route
 app.get("/", async (req: Request, res: Response) => {
 	res.status(httpStatus.OK).json({
