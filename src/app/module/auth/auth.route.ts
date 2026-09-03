@@ -78,19 +78,13 @@ router.post(
 // REFRESH TOKEN
 // ======================================================
 
-router.post(
-	"/refresh-token",
-	AuthController.refreshToken,
-);
+router.post("/refresh-token", AuthController.refreshToken);
 
 // ======================================================
 // LOGOUT
 // ======================================================
 
-router.post(
-	"/logout",
-	AuthController.logoutUser,
-);
+router.post("/logout", AuthController.logoutUser);
 
 // ======================================================
 // PROTECTED ROUTES
@@ -102,11 +96,7 @@ router.post(
 
 router.get(
 	"/me",
-	auth(
-		Role.REQUESTER,
-		Role.DONOR,
-		Role.ADMIN,
-	),
+	auth(Role.REQUESTER, Role.DONOR, Role.ADMIN),
 	AuthController.getMe,
 );
 

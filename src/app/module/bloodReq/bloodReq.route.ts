@@ -4,9 +4,9 @@ import { Role } from "../../../generated/prisma/enums";
 
 import { auth } from "../../middleware/checkAuth";
 import { validateRequest } from "../../middleware/validateRequest";
+
 import { BloodRequestController } from "./bloodReq.controller";
 import { bloodRequestValidation } from "./bloodReq.validation";
-
 
 const router = Router();
 
@@ -17,9 +17,7 @@ const router = Router();
 router.post(
 	"/",
 	auth(Role.REQUESTER),
-	validateRequest(
-		bloodRequestValidation.createBloodRequestSchema,
-	),
+	validateRequest(bloodRequestValidation.createBloodRequestSchema),
 	BloodRequestController.createBloodRequest,
 );
 
@@ -50,9 +48,7 @@ router.get(
 router.patch(
 	"/:requestId",
 	auth(Role.REQUESTER),
-	validateRequest(
-		bloodRequestValidation.updateBloodRequestSchema,
-	),
+	validateRequest(bloodRequestValidation.updateBloodRequestSchema),
 	BloodRequestController.updateBloodRequest,
 );
 

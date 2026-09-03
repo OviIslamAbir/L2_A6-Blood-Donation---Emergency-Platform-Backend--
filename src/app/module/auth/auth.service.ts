@@ -30,11 +30,7 @@ import type {
 // ======================================================
 
 const registerUser = async (payload: IRegisterUserPayload) => {
-	const {
-		name,
-		password,
-		requesterType,
-	} = payload;
+	const { name, password, requesterType } = payload;
 
 	const email = payload.email.trim().toLowerCase();
 
@@ -85,16 +81,12 @@ const registerUser = async (payload: IRegisterUserPayload) => {
 		requesterType,
 	};
 
-	await redisClient.set(
-		registrationKey,
-		JSON.stringify(registrationData),
-		{
-			expiration: {
-				type: "EX",
-				value: 5 * 60,
-			},
+	await redisClient.set(registrationKey, JSON.stringify(registrationData), {
+		expiration: {
+			type: "EX",
+			value: 5 * 60,
 		},
-	);
+	});
 
 	// ==================================================
 	// SEND OTP EMAIL
@@ -206,10 +198,7 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 	// DELETE REDIS DATA
 	// ==================================================
 
-	await redisClient.del([
-		otpKey,
-		registrationKey,
-	]);
+	await redisClient.del([otpKey, registrationKey]);
 
 	// ==================================================
 	// WELCOME EMAIL
@@ -301,10 +290,7 @@ const loginUser = async (payload: ILoginUserPayload) => {
 		throw new Error("Password login is not available for this account.");
 	}
 
-	const passwordMatched = await bcrypt.compare(
-		payload.password,
-		user.password,
-	);
+	const passwordMatched = await bcrypt.compare(payload.password, user.password);
 
 	if (!passwordMatched) {
 		throw new Error("Invalid email or password.");
@@ -503,9 +489,7 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 		}
 
 		if (user.role === "ADMIN") {
-			throw new Error(
-				"Google login is not available for admin accounts.",
-			);
+			throw new Error("Google login is not available for admin accounts.");
 		}
 
 		if (!user.isActive) {
@@ -541,10 +525,7 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 					donorProfile: true,
 				},
 			});
-		} else if (
-			user.googleId &&
-			user.googleId !== googlePayload.sub
-		) {
+		} else if (user.googleId && user.googleId !== googlePayload.sub) {
 			throw new Error(
 				"This email is already connected to another Google account.",
 			);
@@ -664,9 +645,7 @@ const forgotPassword = async (payload: IForgotPasswordPayload) => {
 	}
 
 	if (!user.password) {
-		throw new Error(
-			"Password reset is not available for this account.",
-		);
+		throw new Error("Password reset is not available for this account.");
 	}
 
 	const otp = crypto.randomInt(100000, 1000000).toString();
@@ -831,9 +810,7 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 	}
 
 	if (user.donorApplicationStatus === "PENDING") {
-		throw new Error(
-			"Your donor application is already pending review.",
-		);
+		throw new Error("Your donor application is already pending review.");
 	}
 
 	const bloodGroupMap: Record<string, string> = {
