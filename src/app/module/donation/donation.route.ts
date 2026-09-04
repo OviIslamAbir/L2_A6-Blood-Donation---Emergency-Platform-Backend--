@@ -9,35 +9,35 @@ const router = Router();
 
 // DONOR
 router.post(
-  "/",
-  auth(Role.DONOR),
-  validateRequest(donationValidation.createDonationSchema),
-  DonationController.createDonation,
+	"/",
+	auth(Role.DONOR),
+	validateRequest(donationValidation.createDonationSchema),
+	DonationController.createDonation,
 );
 
 router.get(
-  "/my-donations",
-  auth(Role.DONOR),
-  DonationController.getMyDonations,
+	"/my-donations",
+	auth(Role.DONOR),
+	DonationController.getMyDonations,
 );
 
 router.get(
-  "/:donationId",
-  auth(Role.DONOR, Role.REQUESTER),
-  DonationController.getSingleDonation,
+	"/:donationId",
+	auth(Role.DONOR, Role.REQUESTER),
+	DonationController.getSingleDonation,
 );
 
 router.patch(
-  "/:donationId/complete",
-  auth(Role.DONOR),
-  validateRequest(donationValidation.updateDonationSchema),
-  DonationController.completeDonation,
+	"/:donationId/complete",
+	auth(Role.DONOR),
+	validateRequest(donationValidation.updateDonationSchema),
+	DonationController.completeDonation,
 );
 
 router.patch(
-  "/:donationId/cancel",
-  auth(Role.DONOR),
-  DonationController.cancelDonation,
+	"/:donationId/cancel",
+	auth(Role.DONOR),
+	DonationController.cancelDonation,
 );
 
 export const DonationRoutes = router;

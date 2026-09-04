@@ -1,8 +1,8 @@
 export interface ICreateDonationPayload {
-  requestId: string;
-  notes?: string;
+	requestId: string;
+	notes?: string;
 }
 
 export interface IUpdateDonationPayload {
-  notes?: string;
+	notes?: string;
 }
