@@ -1,21 +1,17 @@
 model DonorProfile {
   id              String   @id @default(uuid())
   userId          String   @unique
-
   user            User     @relation(fields: [userId], references: [id])
 
   bloodGroup      BloodGroup
   dateOfBirth     DateTime?
-
   lastDonationAt  DateTime?
   totalDonations  Int      @default(0)
-
   isAvailable     Boolean  @default(true)
 
   division        String?
   district        String?
   address         String?
-
   latitude        Decimal?
   longitude       Decimal?
 
@@ -35,4 +31,3 @@ model DonorProfile {
   @@index([district])
   @@index([createdAt])
 }
-

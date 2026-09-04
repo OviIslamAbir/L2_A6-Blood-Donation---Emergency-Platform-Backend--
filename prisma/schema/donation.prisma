@@ -1,16 +1,12 @@
-
 model Donation {
   id          String @id @default(uuid())
-
   donorId     String
   requestId   String
 
-  donor       DonorProfile @relation(fields: [donorId], references: [id] )
-
-  request     BloodRequest @relation(fields: [requestId],references: [id] )
+  donor       DonorProfile @relation(fields: [donorId], references: [id])
+  request     BloodRequest @relation(fields: [requestId], references: [id])
 
   status      DonationStatus @default(SCHEDULED)
-
   donatedAt   DateTime?
   notes       String?
 
@@ -22,4 +18,3 @@ model Donation {
   @@index([requestId])
   @@index([status])
 }
-
