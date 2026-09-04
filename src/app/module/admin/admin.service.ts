@@ -1,11 +1,15 @@
-import path from "path";
-import ejs from "ejs";
+import {
+	DonorApplicationStatus,
+	NotificationType,
+	Role,
+} from "../../../generated/prisma/enums";
 
-import { Role, DonorApplicationStatus } from "../../../generated/prisma/enums";
-
-import config from "../../config";
 import { prisma } from "../../lib/prisma";
 import { transporter } from "../../lib/nodemailer";
+import config from "../../config";
+
+import path from "path";
+import ejs from "ejs";
 
 import type {
 	IApproveDonorPayload,
@@ -15,8 +19,12 @@ import type {
 	IDeleteUserPayload,
 } from "./admin.interface";
 
+// ======================================================
+// ALL DONOR APPLICATIONS
+// ======================================================
+
 const getDonorApplications = async () => {
-	const applications = await prisma.user.findMany({
+	return prisma.user.findMany({
 		where: {
 			donorApplicationStatus: {
 				in: [
@@ -40,12 +48,14 @@ const getDonorApplications = async () => {
 			createdAt: "desc",
 		},
 	});
-
-	return applications;
 };
 
+// ======================================================
+// PENDING DONOR APPLICATIONS
+// ======================================================
+
 const getPendingDonorApplications = async () => {
-	const applications = await prisma.user.findMany({
+	return prisma.user.findMany({
 		where: {
 			role: Role.REQUESTER,
 			donorApplicationStatus: DonorApplicationStatus.PENDING,
@@ -64,11 +74,15 @@ const getPendingDonorApplications = async () => {
 			createdAt: "asc",
 		},
 	});
-
-	return applications;
 };
 
-const approveDonorApplication = async (payload: IApproveDonorPayload) => {
+// ======================================================
+// APPROVE DONOR
+// ======================================================
+
+const approveDonorApplication = async (
+	payload: IApproveDonorPayload,
+) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
@@ -99,7 +113,10 @@ const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 		throw new Error("No donor application found.");
 	}
 
-	if (user.donorApplicationStatus !== DonorApplicationStatus.PENDING) {
+	if (
+		user.donorApplicationStatus !==
+		DonorApplicationStatus.PENDING
+	) {
 		throw new Error("This application is not pending.");
 	}
 
@@ -117,7 +134,6 @@ const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 
 			data: {
 				role: Role.DONOR,
-
 				donorApplicationStatus: DonorApplicationStatus.APPROVED,
 			},
 
@@ -138,10 +154,23 @@ const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 			},
 		});
 
+		await tx.notification.create({
+			data: {
+				userId: user.id,
+				title: "🩸 Donor Application Approved",
+				message:
+					"Congratulations! Your donor application has been approved. You are now a verified donor.",
+				type: NotificationType.SYSTEM,
+			},
+		});
+
 		return updated;
 	});
 
-	// Send approval email
+	// ==================================================
+	// APPROVAL EMAIL
+	// ==================================================
+
 	try {
 		const templatePath = path.join(
 			process.cwd(),
@@ -168,7 +197,13 @@ const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 	};
 };
 
-const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
+// ======================================================
+// REJECT DONOR
+// ======================================================
+
+const rejectDonorApplication = async (
+	payload: IRejectDonorPayload,
+) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
@@ -201,9 +236,14 @@ const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
 		throw new Error("No donor application found.");
 	}
 
-	if (user.donorApplicationStatus !== DonorApplicationStatus.PENDING) {
+	if (
+		user.donorApplicationStatus !==
+		DonorApplicationStatus.PENDING
+	) {
 		throw new Error("This application is not pending.");
 	}
+
+	const reason = payload.reason?.trim() || "Not specified";
 
 	await prisma.$transaction(async (tx) => {
 		await tx.user.update({
@@ -212,7 +252,8 @@ const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
 			},
 
 			data: {
-				donorApplicationStatus: DonorApplicationStatus.REJECTED,
+				donorApplicationStatus:
+					DonorApplicationStatus.REJECTED,
 			},
 		});
 
@@ -223,8 +264,17 @@ const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
 
 			data: {
 				rejectedAt: new Date(),
-				rejectReason: payload.reason || "Not specified",
+				rejectReason: reason,
 				approvedAt: null,
+			},
+		});
+
+		await tx.notification.create({
+			data: {
+				userId: user.id,
+				title: "Donor Application Rejected",
+				message: `Your donor application has been rejected. Reason: ${reason}`,
+				type: NotificationType.SYSTEM,
 			},
 		});
 	});
@@ -234,10 +284,16 @@ const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
 	};
 };
 
+// ======================================================
+// ALL USERS
+// ======================================================
+
 const getAllUsers = async (query: IGetUsersQuery) => {
 	const page = Math.max(Number(query.page) || 1, 1);
-
-	const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 100);
+	const limit = Math.min(
+		Math.max(Number(query.limit) || 10, 1),
+		100,
+	);
 
 	const skip = (page - 1) * limit;
 
@@ -260,7 +316,6 @@ const getAllUsers = async (query: IGetUsersQuery) => {
 								mode: "insensitive" as const,
 							},
 						},
-
 						{
 							email: {
 								contains: query.search.trim(),
@@ -320,6 +375,10 @@ const getAllUsers = async (query: IGetUsersQuery) => {
 	};
 };
 
+// ======================================================
+// SINGLE USER
+// ======================================================
+
 const getSingleUser = async (userId: string) => {
 	const user = await prisma.user.findUnique({
 		where: {
@@ -347,7 +406,13 @@ const getSingleUser = async (userId: string) => {
 	return user;
 };
 
-const updateUserStatus = async (payload: IUpdateUserStatusPayload) => {
+// ======================================================
+// ACTIVATE / DEACTIVATE
+// ======================================================
+
+const updateUserStatus = async (
+	payload: IUpdateUserStatusPayload,
+) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
@@ -359,11 +424,15 @@ const updateUserStatus = async (payload: IUpdateUserStatusPayload) => {
 	}
 
 	if (user.deletedAt) {
-		throw new Error("Deleted users cannot be activated or deactivated.");
+		throw new Error(
+			"Deleted users cannot be activated or deactivated.",
+		);
 	}
 
 	if (user.role === Role.ADMIN) {
-		throw new Error("Admin accounts cannot be deactivated from this endpoint.");
+		throw new Error(
+			"Admin accounts cannot be deactivated from this endpoint.",
+		);
 	}
 
 	if (user.isActive === payload.isActive) {
@@ -378,18 +447,38 @@ const updateUserStatus = async (payload: IUpdateUserStatusPayload) => {
 		};
 	}
 
-	const updatedUser = await prisma.user.update({
-		where: {
-			id: user.id,
-		},
+	const updatedUser = await prisma.$transaction(async (tx) => {
+		const updated = await tx.user.update({
+			where: {
+				id: user.id,
+			},
 
-		data: {
-			isActive: payload.isActive,
-		},
+			data: {
+				isActive: payload.isActive,
+			},
 
-		omit: {
-			password: true,
-		},
+			omit: {
+				password: true,
+			},
+		});
+
+		await tx.notification.create({
+			data: {
+				userId: user.id,
+
+				title: payload.isActive
+					? "Account Activated"
+					: "Account Deactivated",
+
+				message: payload.isActive
+					? "Your account has been activated by an administrator."
+					: "Your account has been deactivated by an administrator.",
+
+				type: NotificationType.SYSTEM,
+			},
+		});
+
+		return updated;
 	});
 
 	return {
@@ -400,6 +489,10 @@ const updateUserStatus = async (payload: IUpdateUserStatusPayload) => {
 		user: updatedUser,
 	};
 };
+
+// ======================================================
+// DELETE USER
+// ======================================================
 
 const deleteUser = async (payload: IDeleteUserPayload) => {
 	const user = await prisma.user.findUnique({
@@ -440,6 +533,10 @@ const deleteUser = async (payload: IDeleteUserPayload) => {
 		user: deletedUser,
 	};
 };
+
+// ======================================================
+// DASHBOARD
+// ======================================================
 
 const getDashboardStats = async () => {
 	const [
@@ -482,21 +579,24 @@ const getDashboardStats = async () => {
 
 		prisma.user.count({
 			where: {
-				donorApplicationStatus: DonorApplicationStatus.PENDING,
+				donorApplicationStatus:
+					DonorApplicationStatus.PENDING,
 				deletedAt: null,
 			},
 		}),
 
 		prisma.user.count({
 			where: {
-				donorApplicationStatus: DonorApplicationStatus.APPROVED,
+				donorApplicationStatus:
+					DonorApplicationStatus.APPROVED,
 				deletedAt: null,
 			},
 		}),
 
 		prisma.user.count({
 			where: {
-				donorApplicationStatus: DonorApplicationStatus.REJECTED,
+				donorApplicationStatus:
+					DonorApplicationStatus.REJECTED,
 				deletedAt: null,
 			},
 		}),

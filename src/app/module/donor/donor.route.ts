@@ -1,10 +1,10 @@
 import { Router } from "express";
 
-import { DonorController } from "./donor.controller";
-import { donorValidation } from "./donor.validation";
-
 import { auth } from "../../middleware/checkAuth";
 import { validateRequest } from "../../middleware/validateRequest";
+
+import { DonorController } from "./donor.controller";
+import { donorValidation } from "./donor.validation";
 
 const router = Router();
 
@@ -12,13 +12,16 @@ const router = Router();
 // DONOR PROFILE
 // ======================================================
 
-router.get("/profile", auth("DONOR"), DonorController.getDonorProfile);
+router.get(
+	"/profile",
+	auth("DONOR"),
+	DonorController.getDonorProfile,
+);
 
 // ======================================================
 // APPLICATION STATUS
 // ======================================================
 
-// REQUESTER / DONOR উভয়েই নিজের application status দেখতে পারবে
 router.get(
 	"/application-status",
 	auth(),
@@ -34,38 +37,6 @@ router.patch(
 	auth("DONOR"),
 	validateRequest(donorValidation.updateDonorProfileSchema),
 	DonorController.updateDonorProfile,
-);
-
-// ======================================================
-// NOTIFICATIONS
-// ======================================================
-
-router.get("/notifications", auth("DONOR"), DonorController.getMyNotifications);
-
-router.get(
-	"/notifications/unread-count",
-	auth("DONOR"),
-	DonorController.getUnreadNotificationCount,
-);
-
-// ======================================================
-// MARK ALL READ
-// ======================================================
-
-router.patch(
-	"/notifications/read-all",
-	auth("DONOR"),
-	DonorController.markAllNotificationsAsRead,
-);
-
-// ======================================================
-// MARK ONE READ
-// ======================================================
-
-router.patch(
-	"/notifications/:notificationId/read",
-	auth("DONOR"),
-	DonorController.markNotificationAsRead,
 );
 
 // ======================================================

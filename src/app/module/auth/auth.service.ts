@@ -6,6 +6,13 @@ import crypto from "crypto";
 import path from "path";
 import ejs from "ejs";
 
+import {
+	BloodGroup,
+	DonorApplicationStatus,
+	NotificationType,
+	Role,
+} from "../../../generated/prisma/enums";
+
 import config from "../../config";
 import { prisma } from "../../lib/prisma";
 import { googleClient } from "../../lib/googleAuth";
@@ -26,7 +33,6 @@ import type {
 
 // ======================================================
 // REGISTER USER
-// Always REQUESTER
 // ======================================================
 
 const registerUser = async (payload: IRegisterUserPayload) => {
@@ -53,12 +59,7 @@ const registerUser = async (payload: IRegisterUserPayload) => {
 		Number(config.bcrypt_salt_rounds) || 10,
 	);
 
-	// ==================================================
-	// OTP
-	// ==================================================
-
 	const otpKey = `registration-otp:${email}`;
-
 	const otp = crypto.randomInt(100000, 1000000).toString();
 
 	await redisClient.set(otpKey, otp, {
@@ -67,10 +68,6 @@ const registerUser = async (payload: IRegisterUserPayload) => {
 			value: 5 * 60,
 		},
 	});
-
-	// ==================================================
-	// REGISTRATION DATA
-	// ==================================================
 
 	const registrationKey = `registration-data:${email}`;
 
@@ -81,16 +78,16 @@ const registerUser = async (payload: IRegisterUserPayload) => {
 		requesterType,
 	};
 
-	await redisClient.set(registrationKey, JSON.stringify(registrationData), {
-		expiration: {
-			type: "EX",
-			value: 5 * 60,
+	await redisClient.set(
+		registrationKey,
+		JSON.stringify(registrationData),
+		{
+			expiration: {
+				type: "EX",
+				value: 5 * 60,
+			},
 		},
-	});
-
-	// ==================================================
-	// SEND OTP EMAIL
-	// ==================================================
+	);
 
 	const templatePath = path.join(
 		process.cwd(),
@@ -134,12 +131,7 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 		throw new Error("Email is already verified.");
 	}
 
-	// ==================================================
-	// CHECK OTP
-	// ==================================================
-
 	const otpKey = `registration-otp:${email}`;
-
 	const redisOtp = await redisClient.get(otpKey);
 
 	if (!redisOtp) {
@@ -150,12 +142,7 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 		throw new Error("Invalid OTP.");
 	}
 
-	// ==================================================
-	// GET REGISTRATION DATA
-	// ==================================================
-
 	const registrationKey = `registration-data:${email}`;
-
 	const redisUserData = await redisClient.get(registrationKey);
 
 	if (!redisUserData) {
@@ -166,43 +153,26 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 		name: string;
 		email: string;
 		password: string;
-		requesterType: "PATIENT" | "HOSPITAL";
+		requesterType: IRegisterUserPayload["requesterType"];
 	};
-
-	// ==================================================
-	// CREATE USER
-	// ==================================================
 
 	const createdUser = await prisma.user.create({
 		data: {
 			name: registrationData.name,
 			email: registrationData.email,
 			password: registrationData.password,
-
-			role: "REQUESTER",
-
-			// IMPORTANT
+			role: Role.REQUESTER,
 			requesterType: registrationData.requesterType,
-
 			emailVerified: true,
 			isActive: true,
-			donorApplicationStatus: "NONE",
+			donorApplicationStatus: DonorApplicationStatus.NONE,
 		},
-
 		omit: {
 			password: true,
 		},
 	});
 
-	// ==================================================
-	// DELETE REDIS DATA
-	// ==================================================
-
 	await redisClient.del([otpKey, registrationKey]);
-
-	// ==================================================
-	// WELCOME EMAIL
-	// ==================================================
 
 	const templatePath = path.join(
 		process.cwd(),
@@ -219,10 +189,6 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 		subject: "Welcome To Blood Donation Platform",
 		html,
 	});
-
-	// ==================================================
-	// JWT
-	// ==================================================
 
 	const jwtPayload = {
 		userId: createdUser.id,
@@ -290,7 +256,10 @@ const loginUser = async (payload: ILoginUserPayload) => {
 		throw new Error("Password login is not available for this account.");
 	}
 
-	const passwordMatched = await bcrypt.compare(payload.password, user.password);
+	const passwordMatched = await bcrypt.compare(
+		payload.password,
+		user.password,
+	);
 
 	if (!passwordMatched) {
 		throw new Error("Invalid email or password.");
@@ -333,11 +302,9 @@ const getMe = async (user: IRequestUser) => {
 		where: {
 			id: user.userId,
 		},
-
 		include: {
 			donorProfile: true,
 		},
-
 		omit: {
 			password: true,
 		},
@@ -471,25 +438,22 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 
 	let user = await prisma.user.findUnique({
 		where: { email },
-
 		include: {
 			donorProfile: true,
 		},
 	});
 
-	// ==================================================
-	// EXISTING USER
-	// ==================================================
-
 	if (user) {
-		if (user.role === "DONOR") {
+		if (user.role === Role.DONOR) {
 			throw new Error(
 				"Donor accounts cannot login with Google. Please use email and password.",
 			);
 		}
 
-		if (user.role === "ADMIN") {
-			throw new Error("Google login is not available for admin accounts.");
+		if (user.role === Role.ADMIN) {
+			throw new Error(
+				"Google login is not available for admin accounts.",
+			);
 		}
 
 		if (!user.isActive) {
@@ -504,7 +468,7 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 			throw new Error("Please verify your email first.");
 		}
 
-		if (user.donorApplicationStatus === "PENDING") {
+		if (user.donorApplicationStatus === DonorApplicationStatus.PENDING) {
 			throw new Error(
 				"Your donor application is pending. Please use email and password login.",
 			);
@@ -515,46 +479,36 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 				where: {
 					id: user.id,
 				},
-
 				data: {
 					googleId: googlePayload.sub,
 					emailVerified: true,
 				},
-
 				include: {
 					donorProfile: true,
 				},
 			});
-		} else if (user.googleId && user.googleId !== googlePayload.sub) {
+		} else if (
+			user.googleId &&
+			user.googleId !== googlePayload.sub
+		) {
 			throw new Error(
 				"This email is already connected to another Google account.",
 			);
 		}
 	}
 
-	// ==================================================
-	// CREATE GOOGLE USER
-	// ==================================================
-
 	if (!user) {
 		user = await prisma.user.create({
 			data: {
 				name: googlePayload.name,
 				email,
-
-				role: "REQUESTER",
-
+				role: Role.REQUESTER,
 				googleId: googlePayload.sub,
 				emailVerified: true,
 				isActive: true,
-
-				// Google registration does not know
-				// whether user is PATIENT or HOSPITAL.
 				requesterType: null,
-
-				donorApplicationStatus: "NONE",
+				donorApplicationStatus: DonorApplicationStatus.NONE,
 			},
-
 			include: {
 				donorProfile: true,
 			},
@@ -576,10 +530,6 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 			html,
 		});
 	}
-
-	// ==================================================
-	// JWT
-	// ==================================================
 
 	const jwtPayload = {
 		userId: user.id,
@@ -720,7 +670,6 @@ const resetPassword = async (payload: IResetPasswordPayload) => {
 	}
 
 	const key = `forgot-password-otp:${email}`;
-
 	const redisOtp = await redisClient.get(key);
 
 	if (!redisOtp) {
@@ -740,7 +689,6 @@ const resetPassword = async (payload: IResetPasswordPayload) => {
 		where: {
 			id: user.id,
 		},
-
 		data: {
 			password: hashedPassword,
 		},
@@ -779,7 +727,6 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 		where: {
 			id: payload.userId,
 		},
-
 		include: {
 			donorProfile: true,
 		},
@@ -801,27 +748,32 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 		throw new Error("Please verify your email first.");
 	}
 
-	if (user.role !== "REQUESTER") {
-		if (user.role === "DONOR") {
+	if (user.role !== Role.REQUESTER) {
+		if (user.role === Role.DONOR) {
 			throw new Error("You are already a donor.");
 		}
 
 		throw new Error("Only requester accounts can apply for donor.");
 	}
 
-	if (user.donorApplicationStatus === "PENDING") {
-		throw new Error("Your donor application is already pending review.");
+	if (
+		user.donorApplicationStatus ===
+		DonorApplicationStatus.PENDING
+	) {
+		throw new Error(
+			"Your donor application is already pending review.",
+		);
 	}
 
-	const bloodGroupMap: Record<string, string> = {
-		"A+": "A_POSITIVE",
-		"A-": "A_NEGATIVE",
-		"B+": "B_POSITIVE",
-		"B-": "B_NEGATIVE",
-		"AB+": "AB_POSITIVE",
-		"AB-": "AB_NEGATIVE",
-		"O+": "O_POSITIVE",
-		"O-": "O_NEGATIVE",
+	const bloodGroupMap: Record<string, BloodGroup> = {
+		"A+": BloodGroup.A_POSITIVE,
+		"A-": BloodGroup.A_NEGATIVE,
+		"B+": BloodGroup.B_POSITIVE,
+		"B-": BloodGroup.B_NEGATIVE,
+		"AB+": BloodGroup.AB_POSITIVE,
+		"AB-": BloodGroup.AB_NEGATIVE,
+		"O+": BloodGroup.O_POSITIVE,
+		"O-": BloodGroup.O_NEGATIVE,
 	};
 
 	const bloodGroup = bloodGroupMap[payload.bloodGroup];
@@ -846,41 +798,31 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 		where: {
 			userId: user.id,
 		},
-
 		create: {
 			userId: user.id,
-
-			bloodGroup: bloodGroup as any,
-
+			bloodGroup,
 			dateOfBirth,
-
 			division: payload.division,
 			district: payload.district,
 			address: payload.address,
-
 			latitude: payload.latitude,
 			longitude: payload.longitude,
-
 			appliedAt: new Date(),
 			rejectedAt: null,
 			rejectReason: null,
 		},
-
 		update: {
-			bloodGroup: bloodGroup as any,
-
+			bloodGroup,
 			dateOfBirth,
-
 			division: payload.division,
 			district: payload.district,
 			address: payload.address,
-
 			latitude: payload.latitude,
 			longitude: payload.longitude,
-
 			appliedAt: new Date(),
 			rejectedAt: null,
 			rejectReason: null,
+			approvedAt: null,
 		},
 	});
 
@@ -888,11 +830,36 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 		where: {
 			id: user.id,
 		},
-
 		data: {
-			donorApplicationStatus: "PENDING",
+			donorApplicationStatus: DonorApplicationStatus.PENDING,
 		},
 	});
+
+	// ==================================================
+	// NOTIFY ADMINS
+	// ==================================================
+
+	const admins = await prisma.user.findMany({
+		where: {
+			role: Role.ADMIN,
+			isActive: true,
+			deletedAt: null,
+		},
+		select: {
+			id: true,
+		},
+	});
+
+	if (admins.length > 0) {
+		await prisma.notification.createMany({
+			data: admins.map((admin) => ({
+				userId: admin.id,
+				title: "🩸 New Donor Application",
+				message: `${user.name} has submitted a new donor application. Please review the application.`,
+				type: NotificationType.SYSTEM,
+			})),
+		});
+	}
 
 	return {
 		message: "Donor application submitted. Waiting for admin approval.",

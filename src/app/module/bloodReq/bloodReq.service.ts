@@ -1,4 +1,9 @@
-import { RequestStatus, Role, Urgency } from "../../../generated/prisma/enums";
+import {
+	NotificationType,
+	RequestStatus,
+	Role,
+	Urgency,
+} from "../../../generated/prisma/enums";
 
 import { prisma } from "../../lib/prisma";
 
@@ -15,17 +20,13 @@ const createBloodRequest = async (
 	requesterId: string,
 	payload: ICreateBloodRequestPayload,
 ) => {
-	// ==================================================
-	// GET REQUESTER
-	// ==================================================
-
 	const user = await prisma.user.findUnique({
 		where: {
 			id: requesterId,
 		},
-
 		select: {
 			id: true,
+			name: true,
 			role: true,
 			requesterType: true,
 			isActive: true,
@@ -33,10 +34,6 @@ const createBloodRequest = async (
 			emailVerified: true,
 		},
 	});
-
-	// ==================================================
-	// USER VALIDATION
-	// ==================================================
 
 	if (!user) {
 		throw new Error("User not found.");
@@ -58,19 +55,11 @@ const createBloodRequest = async (
 		throw new Error("Only requester accounts can create blood requests.");
 	}
 
-	// ==================================================
-	// REQUESTER TYPE VALIDATION
-	// ==================================================
-
 	if (!user.requesterType) {
 		throw new Error(
 			"Requester type is not configured. Please complete your profile.",
 		);
 	}
-
-	// ==================================================
-	// NEEDED AT
-	// ==================================================
 
 	let neededAt: Date | undefined;
 
@@ -84,26 +73,16 @@ const createBloodRequest = async (
 		neededAt = parsedDate;
 	}
 
-	// ==================================================
-	// CREATE BLOOD REQUEST
-	// ==================================================
-
 	const bloodRequest = await prisma.bloodRequest.create({
 		data: {
 			requesterId,
-
-			// IMPORTANT:
-			// Comes from authenticated user's DB record.
 			requesterType: user.requesterType,
 
 			patientName: payload.patientName.trim(),
-
 			bloodGroup: payload.bloodGroup,
-
 			units: payload.units,
 
 			hospitalName: payload.hospitalName.trim(),
-
 			hospitalAddress: payload.hospitalAddress.trim(),
 
 			...(payload.division !== undefined && {
@@ -136,6 +115,41 @@ const createBloodRequest = async (
 		},
 	});
 
+	// ==================================================
+	// NOTIFY ADMINS
+	// ==================================================
+
+	const admins = await prisma.user.findMany({
+		where: {
+			role: Role.ADMIN,
+			isActive: true,
+			deletedAt: null,
+		},
+		select: {
+			id: true,
+		},
+	});
+
+	if (admins.length > 0) {
+		const isCritical = bloodRequest.urgency === Urgency.CRITICAL;
+
+		await prisma.notification.createMany({
+			data: admins.map((admin) => ({
+				userId: admin.id,
+
+				title: isCritical
+					? "🚨 Critical Blood Request"
+					: "🩸 New Blood Request",
+
+				message: isCritical
+					? `A critical ${bloodRequest.bloodGroup} blood request has been created for ${bloodRequest.patientName} at ${bloodRequest.hospitalName}.`
+					: `A new ${bloodRequest.bloodGroup} blood request has been created for ${bloodRequest.patientName} at ${bloodRequest.hospitalName}.`,
+
+				type: NotificationType.BLOOD_REQUEST,
+			})),
+		});
+	}
+
 	return {
 		message: "Blood request created successfully.",
 		bloodRequest,
@@ -152,7 +166,6 @@ const getMyBloodRequests = async (requesterId: string) => {
 			requesterId,
 			deletedAt: null,
 		},
-
 		orderBy: {
 			createdAt: "desc",
 		},
@@ -175,7 +188,6 @@ const getSingleBloodRequest = async (
 		where: {
 			id: requestId,
 		},
-
 		include: {
 			donorMatches: true,
 			donations: true,
@@ -212,10 +224,6 @@ const updateBloodRequest = async (
 		},
 	});
 
-	// ==================================================
-	// VALIDATION
-	// ==================================================
-
 	if (!existingRequest) {
 		throw new Error("Blood request not found.");
 	}
@@ -232,10 +240,6 @@ const updateBloodRequest = async (
 		throw new Error("Only pending blood requests can be updated.");
 	}
 
-	// ==================================================
-	// NEEDED AT
-	// ==================================================
-
 	let neededAt: Date | undefined;
 
 	if (payload.neededAt !== undefined) {
@@ -248,15 +252,10 @@ const updateBloodRequest = async (
 		neededAt = parsedDate;
 	}
 
-	// ==================================================
-	// UPDATE
-	// ==================================================
-
 	const bloodRequest = await prisma.bloodRequest.update({
 		where: {
 			id: requestId,
 		},
-
 		data: {
 			...(payload.patientName !== undefined && {
 				patientName: payload.patientName.trim(),
@@ -318,16 +317,15 @@ const updateBloodRequest = async (
 // CANCEL BLOOD REQUEST
 // ======================================================
 
-const cancelBloodRequest = async (requesterId: string, requestId: string) => {
+const cancelBloodRequest = async (
+	requesterId: string,
+	requestId: string,
+) => {
 	const existingRequest = await prisma.bloodRequest.findUnique({
 		where: {
 			id: requestId,
 		},
 	});
-
-	// ==================================================
-	// VALIDATION
-	// ==================================================
 
 	if (!existingRequest) {
 		throw new Error("Blood request not found.");
@@ -345,15 +343,10 @@ const cancelBloodRequest = async (requesterId: string, requestId: string) => {
 		throw new Error("Only pending blood requests can be cancelled.");
 	}
 
-	// ==================================================
-	// SOFT DELETE
-	// ==================================================
-
 	const bloodRequest = await prisma.bloodRequest.update({
 		where: {
 			id: requestId,
 		},
-
 		data: {
 			deletedAt: new Date(),
 			status: RequestStatus.CANCELLED,
@@ -365,10 +358,6 @@ const cancelBloodRequest = async (requesterId: string, requestId: string) => {
 		bloodRequest,
 	};
 };
-
-// ======================================================
-// EXPORT
-// ======================================================
 
 export const BloodRequestService = {
 	createBloodRequest,

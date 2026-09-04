@@ -54,7 +54,9 @@ const getDonorProfile = async (userId: string) => {
 	}
 
 	if (user.role !== Role.DONOR) {
-		throw new Error("Only approved donors can access donor profile.");
+		throw new Error(
+			"Only approved donors can access donor profile.",
+		);
 	}
 
 	if (!user.donorProfile) {
@@ -97,9 +99,7 @@ const getDonorApplicationStatus = async (userId: string) => {
 
 	return {
 		role: user.role,
-
 		applicationStatus: user.donorApplicationStatus,
-
 		donorProfile: user.donorProfile,
 	};
 };
@@ -135,7 +135,9 @@ const updateDonorProfile = async (
 	}
 
 	if (user.role !== Role.DONOR) {
-		throw new Error("Only approved donors can update donor profile.");
+		throw new Error(
+			"Only approved donors can update donor profile.",
+		);
 	}
 
 	if (!user.donorProfile) {
@@ -219,161 +221,6 @@ const updateDonorProfile = async (
 };
 
 // ======================================================
-// GET DONOR NOTIFICATIONS
-// ======================================================
-
-const getMyNotifications = async (userId: string) => {
-	const user = await prisma.user.findUnique({
-		where: {
-			id: userId,
-		},
-
-		select: {
-			id: true,
-			role: true,
-			isActive: true,
-			deletedAt: true,
-		},
-	});
-
-	if (!user) {
-		throw new Error("User not found.");
-	}
-
-	if (user.deletedAt) {
-		throw new Error("Your account has been deleted.");
-	}
-
-	if (!user.isActive) {
-		throw new Error("Your account is inactive.");
-	}
-
-	if (user.role !== Role.DONOR) {
-		throw new Error("Only donors can access notifications.");
-	}
-
-	const notifications = await prisma.notification.findMany({
-		where: {
-			userId,
-		},
-
-		orderBy: {
-			createdAt: "desc",
-		},
-	});
-
-	return {
-		notifications,
-	};
-};
-
-// ======================================================
-// GET UNREAD NOTIFICATION COUNT
-// ======================================================
-
-const getUnreadNotificationCount = async (userId: string) => {
-	const user = await prisma.user.findUnique({
-		where: {
-			id: userId,
-		},
-
-		select: {
-			id: true,
-			role: true,
-			isActive: true,
-			deletedAt: true,
-		},
-	});
-
-	if (!user) {
-		throw new Error("User not found.");
-	}
-
-	if (user.deletedAt) {
-		throw new Error("Your account has been deleted.");
-	}
-
-	if (!user.isActive) {
-		throw new Error("Your account is inactive.");
-	}
-
-	if (user.role !== Role.DONOR) {
-		throw new Error("Only donors can access notifications.");
-	}
-
-	const count = await prisma.notification.count({
-		where: {
-			userId,
-			isRead: false,
-		},
-	});
-
-	return {
-		unreadCount: count,
-	};
-};
-
-// ======================================================
-// MARK ONE NOTIFICATION AS READ
-// ======================================================
-
-const markNotificationAsRead = async (
-	userId: string,
-	notificationId: string,
-) => {
-	const notification = await prisma.notification.findUnique({
-		where: {
-			id: notificationId,
-		},
-	});
-
-	if (!notification) {
-		throw new Error("Notification not found.");
-	}
-
-	if (notification.userId !== userId) {
-		throw new Error("You cannot access this notification.");
-	}
-
-	const updated = await prisma.notification.update({
-		where: {
-			id: notificationId,
-		},
-
-		data: {
-			isRead: true,
-		},
-	});
-
-	return {
-		message: "Notification marked as read.",
-		notification: updated,
-	};
-};
-
-// ======================================================
-// MARK ALL NOTIFICATIONS AS READ
-// ======================================================
-
-const markAllNotificationsAsRead = async (userId: string) => {
-	const result = await prisma.notification.updateMany({
-		where: {
-			userId,
-			isRead: false,
-		},
-
-		data: {
-			isRead: true,
-		},
-	});
-
-	return {
-		message: "All notifications marked as read.",
-		updatedCount: result.count,
-	};
-};
-
-// ======================================================
 // EXPORT
 // ======================================================
 
@@ -381,8 +228,4 @@ export const DonorService = {
 	getDonorProfile,
 	getDonorApplicationStatus,
 	updateDonorProfile,
-	getMyNotifications,
-	getUnreadNotificationCount,
-	markNotificationAsRead,
-	markAllNotificationsAsRead,
 };
