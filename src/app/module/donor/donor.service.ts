@@ -54,9 +54,7 @@ const getDonorProfile = async (userId: string) => {
 	}
 
 	if (user.role !== Role.DONOR) {
-		throw new Error(
-			"Only approved donors can access donor profile.",
-		);
+		throw new Error("Only approved donors can access donor profile.");
 	}
 
 	if (!user.donorProfile) {
@@ -135,9 +133,7 @@ const updateDonorProfile = async (
 	}
 
 	if (user.role !== Role.DONOR) {
-		throw new Error(
-			"Only approved donors can update donor profile.",
-		);
+		throw new Error("Only approved donors can update donor profile.");
 	}
 
 	if (!user.donorProfile) {

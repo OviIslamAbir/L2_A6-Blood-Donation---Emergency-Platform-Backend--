@@ -7,6 +7,8 @@ import { DonorMatchController } from "./donorMatch.controller";
 
 const router = Router();
 
+// Get my blood request matches
+router.get("/my-matches", auth(Role.DONOR), DonorMatchController.getMyMatches);
 // ======================================================
 // REQUESTER
 // ======================================================
@@ -28,9 +30,6 @@ router.get(
 // ======================================================
 // DONOR
 // ======================================================
-
-// Get my blood request matches
-router.get("/my-matches", auth(Role.DONOR), DonorMatchController.getMyMatches);
 
 // Accept a donor match
 router.patch(

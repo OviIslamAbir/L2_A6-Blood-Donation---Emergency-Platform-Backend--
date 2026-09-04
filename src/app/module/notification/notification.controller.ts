@@ -9,28 +9,23 @@ import { NotificationService } from "./notification.service";
 // GET MY NOTIFICATIONS
 // ======================================================
 
-const getMyNotifications = catchAsync(
-	async (req: Request, res: Response) => {
-		if (!req.user) {
-			throw new Error(
-				"User information is missing in the request.",
-			);
-		}
+const getMyNotifications = catchAsync(async (req: Request, res: Response) => {
+	if (!req.user) {
+		throw new Error("User information is missing in the request.");
+	}
 
-		const result =
-			await NotificationService.getMyNotifications(
-				req.user.userId,
-				req.query,
-			);
+	const result = await NotificationService.getMyNotifications(
+		req.user.userId,
+		req.query,
+	);
 
-		sendResponse(res, {
-			statusCode: 200,
-			success: true,
-			message: "Notifications retrieved successfully.",
-			data: result,
-		});
-	},
-);
+	sendResponse(res, {
+		statusCode: 200,
+		success: true,
+		message: "Notifications retrieved successfully.",
+		data: result,
+	});
+});
 
 // ======================================================
 // UNREAD COUNT
@@ -39,15 +34,12 @@ const getMyNotifications = catchAsync(
 const getUnreadNotificationCount = catchAsync(
 	async (req: Request, res: Response) => {
 		if (!req.user) {
-			throw new Error(
-				"User information is missing in the request.",
-			);
+			throw new Error("User information is missing in the request.");
 		}
 
-		const result =
-			await NotificationService.getUnreadNotificationCount(
-				req.user.userId,
-			);
+		const result = await NotificationService.getUnreadNotificationCount(
+			req.user.userId,
+		);
 
 		sendResponse(res, {
 			statusCode: 200,
@@ -65,16 +57,13 @@ const getUnreadNotificationCount = catchAsync(
 const markNotificationAsRead = catchAsync(
 	async (req: Request, res: Response) => {
 		if (!req.user) {
-			throw new Error(
-				"User information is missing in the request.",
-			);
+			throw new Error("User information is missing in the request.");
 		}
 
-		const result =
-			await NotificationService.markNotificationAsRead(
-				req.user.userId,
-				String(req.params.notificationId),
-			);
+		const result = await NotificationService.markNotificationAsRead(
+			req.user.userId,
+			String(req.params.notificationId),
+		);
 
 		sendResponse(res, {
 			statusCode: 200,
@@ -92,15 +81,12 @@ const markNotificationAsRead = catchAsync(
 const markAllNotificationsAsRead = catchAsync(
 	async (req: Request, res: Response) => {
 		if (!req.user) {
-			throw new Error(
-				"User information is missing in the request.",
-			);
+			throw new Error("User information is missing in the request.");
 		}
 
-		const result =
-			await NotificationService.markAllNotificationsAsRead(
-				req.user.userId,
-			);
+		const result = await NotificationService.markAllNotificationsAsRead(
+			req.user.userId,
+		);
 
 		sendResponse(res, {
 			statusCode: 200,
@@ -115,28 +101,23 @@ const markAllNotificationsAsRead = catchAsync(
 // DELETE
 // ======================================================
 
-const deleteNotification = catchAsync(
-	async (req: Request, res: Response) => {
-		if (!req.user) {
-			throw new Error(
-				"User information is missing in the request.",
-			);
-		}
+const deleteNotification = catchAsync(async (req: Request, res: Response) => {
+	if (!req.user) {
+		throw new Error("User information is missing in the request.");
+	}
 
-		const result =
-			await NotificationService.deleteNotification(
-				req.user.userId,
-				String(req.params.notificationId),
-			);
+	const result = await NotificationService.deleteNotification(
+		req.user.userId,
+		String(req.params.notificationId),
+	);
 
-		sendResponse(res, {
-			statusCode: 200,
-			success: true,
-			message: result.message,
-			data: null,
-		});
-	},
-);
+	sendResponse(res, {
+		statusCode: 200,
+		success: true,
+		message: result.message,
+		data: null,
+	});
+});
 
 export const NotificationController = {
 	getMyNotifications,

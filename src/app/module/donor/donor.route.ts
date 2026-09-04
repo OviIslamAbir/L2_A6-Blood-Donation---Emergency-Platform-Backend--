@@ -12,11 +12,7 @@ const router = Router();
 // DONOR PROFILE
 // ======================================================
 
-router.get(
-	"/profile",
-	auth("DONOR"),
-	DonorController.getDonorProfile,
-);
+router.get("/profile", auth("DONOR"), DonorController.getDonorProfile);
 
 // ======================================================
 // APPLICATION STATUS

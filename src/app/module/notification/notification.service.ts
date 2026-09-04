@@ -12,10 +12,7 @@ const getMyNotifications = async (
 ) => {
 	const page = Math.max(Number(query.page) || 1, 1);
 
-	const limit = Math.min(
-		Math.max(Number(query.limit) || 20, 1),
-		100,
-	);
+	const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
 
 	const skip = (page - 1) * limit;
 
@@ -33,29 +30,28 @@ const getMyNotifications = async (
 				: {}),
 	};
 
-	const [notifications, total, unreadCount] =
-		await Promise.all([
-			prisma.notification.findMany({
-				where,
-				skip,
-				take: limit,
+	const [notifications, total, unreadCount] = await Promise.all([
+		prisma.notification.findMany({
+			where,
+			skip,
+			take: limit,
 
-				orderBy: {
-					createdAt: "desc",
-				},
-			}),
+			orderBy: {
+				createdAt: "desc",
+			},
+		}),
 
-			prisma.notification.count({
-				where,
-			}),
+		prisma.notification.count({
+			where,
+		}),
 
-			prisma.notification.count({
-				where: {
-					userId,
-					isRead: false,
-				},
-			}),
-		]);
+		prisma.notification.count({
+			where: {
+				userId,
+				isRead: false,
+			},
+		}),
+	]);
 
 	return {
 		meta: {
@@ -74,9 +70,7 @@ const getMyNotifications = async (
 // UNREAD COUNT
 // ======================================================
 
-const getUnreadNotificationCount = async (
-	userId: string,
-) => {
+const getUnreadNotificationCount = async (userId: string) => {
 	const count = await prisma.notification.count({
 		where: {
 			userId,
@@ -108,21 +102,18 @@ const markNotificationAsRead = async (
 	}
 
 	if (notification.userId !== userId) {
-		throw new Error(
-			"You cannot access this notification.",
-		);
+		throw new Error("You cannot access this notification.");
 	}
 
-	const updatedNotification =
-		await prisma.notification.update({
-			where: {
-				id: notificationId,
-			},
+	const updatedNotification = await prisma.notification.update({
+		where: {
+			id: notificationId,
+		},
 
-			data: {
-				isRead: true,
-			},
-		});
+		data: {
+			isRead: true,
+		},
+	});
 
 	return updatedNotification;
 };
@@ -131,9 +122,7 @@ const markNotificationAsRead = async (
 // MARK ALL AS READ
 // ======================================================
 
-const markAllNotificationsAsRead = async (
-	userId: string,
-) => {
+const markAllNotificationsAsRead = async (userId: string) => {
 	const result = await prisma.notification.updateMany({
 		where: {
 			userId,
@@ -155,10 +144,7 @@ const markAllNotificationsAsRead = async (
 // DELETE ONE NOTIFICATION
 // ======================================================
 
-const deleteNotification = async (
-	userId: string,
-	notificationId: string,
-) => {
+const deleteNotification = async (userId: string, notificationId: string) => {
 	const notification = await prisma.notification.findUnique({
 		where: {
 			id: notificationId,
@@ -170,9 +156,7 @@ const deleteNotification = async (
 	}
 
 	if (notification.userId !== userId) {
-		throw new Error(
-			"You cannot delete this notification.",
-		);
+		throw new Error("You cannot delete this notification.");
 	}
 
 	await prisma.notification.delete({

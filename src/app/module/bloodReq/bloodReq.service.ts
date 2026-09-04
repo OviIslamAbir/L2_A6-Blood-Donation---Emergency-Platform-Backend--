@@ -317,10 +317,7 @@ const updateBloodRequest = async (
 // CANCEL BLOOD REQUEST
 // ======================================================
 
-const cancelBloodRequest = async (
-	requesterId: string,
-	requestId: string,
-) => {
+const cancelBloodRequest = async (requesterId: string, requestId: string) => {
 	const existingRequest = await prisma.bloodRequest.findUnique({
 		where: {
 			id: requestId,

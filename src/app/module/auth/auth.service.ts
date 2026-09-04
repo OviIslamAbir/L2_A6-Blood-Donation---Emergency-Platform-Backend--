@@ -78,16 +78,12 @@ const registerUser = async (payload: IRegisterUserPayload) => {
 		requesterType,
 	};
 
-	await redisClient.set(
-		registrationKey,
-		JSON.stringify(registrationData),
-		{
-			expiration: {
-				type: "EX",
-				value: 5 * 60,
-			},
+	await redisClient.set(registrationKey, JSON.stringify(registrationData), {
+		expiration: {
+			type: "EX",
+			value: 5 * 60,
 		},
-	);
+	});
 
 	const templatePath = path.join(
 		process.cwd(),
@@ -256,10 +252,7 @@ const loginUser = async (payload: ILoginUserPayload) => {
 		throw new Error("Password login is not available for this account.");
 	}
 
-	const passwordMatched = await bcrypt.compare(
-		payload.password,
-		user.password,
-	);
+	const passwordMatched = await bcrypt.compare(payload.password, user.password);
 
 	if (!passwordMatched) {
 		throw new Error("Invalid email or password.");
@@ -451,9 +444,7 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 		}
 
 		if (user.role === Role.ADMIN) {
-			throw new Error(
-				"Google login is not available for admin accounts.",
-			);
+			throw new Error("Google login is not available for admin accounts.");
 		}
 
 		if (!user.isActive) {
@@ -487,10 +478,7 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 					donorProfile: true,
 				},
 			});
-		} else if (
-			user.googleId &&
-			user.googleId !== googlePayload.sub
-		) {
+		} else if (user.googleId && user.googleId !== googlePayload.sub) {
 			throw new Error(
 				"This email is already connected to another Google account.",
 			);
@@ -756,13 +744,8 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 		throw new Error("Only requester accounts can apply for donor.");
 	}
 
-	if (
-		user.donorApplicationStatus ===
-		DonorApplicationStatus.PENDING
-	) {
-		throw new Error(
-			"Your donor application is already pending review.",
-		);
+	if (user.donorApplicationStatus === DonorApplicationStatus.PENDING) {
+		throw new Error("Your donor application is already pending review.");
 	}
 
 	const bloodGroupMap: Record<string, BloodGroup> = {

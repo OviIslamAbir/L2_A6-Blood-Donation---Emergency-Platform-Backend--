@@ -80,9 +80,7 @@ const getPendingDonorApplications = async () => {
 // APPROVE DONOR
 // ======================================================
 
-const approveDonorApplication = async (
-	payload: IApproveDonorPayload,
-) => {
+const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
@@ -113,10 +111,7 @@ const approveDonorApplication = async (
 		throw new Error("No donor application found.");
 	}
 
-	if (
-		user.donorApplicationStatus !==
-		DonorApplicationStatus.PENDING
-	) {
+	if (user.donorApplicationStatus !== DonorApplicationStatus.PENDING) {
 		throw new Error("This application is not pending.");
 	}
 
@@ -201,9 +196,7 @@ const approveDonorApplication = async (
 // REJECT DONOR
 // ======================================================
 
-const rejectDonorApplication = async (
-	payload: IRejectDonorPayload,
-) => {
+const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
@@ -236,10 +229,7 @@ const rejectDonorApplication = async (
 		throw new Error("No donor application found.");
 	}
 
-	if (
-		user.donorApplicationStatus !==
-		DonorApplicationStatus.PENDING
-	) {
+	if (user.donorApplicationStatus !== DonorApplicationStatus.PENDING) {
 		throw new Error("This application is not pending.");
 	}
 
@@ -252,8 +242,7 @@ const rejectDonorApplication = async (
 			},
 
 			data: {
-				donorApplicationStatus:
-					DonorApplicationStatus.REJECTED,
+				donorApplicationStatus: DonorApplicationStatus.REJECTED,
 			},
 		});
 
@@ -290,10 +279,7 @@ const rejectDonorApplication = async (
 
 const getAllUsers = async (query: IGetUsersQuery) => {
 	const page = Math.max(Number(query.page) || 1, 1);
-	const limit = Math.min(
-		Math.max(Number(query.limit) || 10, 1),
-		100,
-	);
+	const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 100);
 
 	const skip = (page - 1) * limit;
 
@@ -410,9 +396,7 @@ const getSingleUser = async (userId: string) => {
 // ACTIVATE / DEACTIVATE
 // ======================================================
 
-const updateUserStatus = async (
-	payload: IUpdateUserStatusPayload,
-) => {
+const updateUserStatus = async (payload: IUpdateUserStatusPayload) => {
 	const user = await prisma.user.findUnique({
 		where: {
 			id: payload.userId,
@@ -424,15 +408,11 @@ const updateUserStatus = async (
 	}
 
 	if (user.deletedAt) {
-		throw new Error(
-			"Deleted users cannot be activated or deactivated.",
-		);
+		throw new Error("Deleted users cannot be activated or deactivated.");
 	}
 
 	if (user.role === Role.ADMIN) {
-		throw new Error(
-			"Admin accounts cannot be deactivated from this endpoint.",
-		);
+		throw new Error("Admin accounts cannot be deactivated from this endpoint.");
 	}
 
 	if (user.isActive === payload.isActive) {
@@ -466,9 +446,7 @@ const updateUserStatus = async (
 			data: {
 				userId: user.id,
 
-				title: payload.isActive
-					? "Account Activated"
-					: "Account Deactivated",
+				title: payload.isActive ? "Account Activated" : "Account Deactivated",
 
 				message: payload.isActive
 					? "Your account has been activated by an administrator."
@@ -579,24 +557,21 @@ const getDashboardStats = async () => {
 
 		prisma.user.count({
 			where: {
-				donorApplicationStatus:
-					DonorApplicationStatus.PENDING,
+				donorApplicationStatus: DonorApplicationStatus.PENDING,
 				deletedAt: null,
 			},
 		}),
 
 		prisma.user.count({
 			where: {
-				donorApplicationStatus:
-					DonorApplicationStatus.APPROVED,
+				donorApplicationStatus: DonorApplicationStatus.APPROVED,
 				deletedAt: null,
 			},
 		}),
 
 		prisma.user.count({
 			where: {
-				donorApplicationStatus:
-					DonorApplicationStatus.REJECTED,
+				donorApplicationStatus: DonorApplicationStatus.REJECTED,
 				deletedAt: null,
 			},
 		}),
