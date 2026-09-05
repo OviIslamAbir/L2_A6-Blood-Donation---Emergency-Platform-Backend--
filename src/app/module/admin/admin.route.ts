@@ -29,7 +29,15 @@ router.get(
 	auth("ADMIN"),
 	AdminController.getPendingDonorApplications,
 );
+// ======================================================
+// VERIFY BLOOD REQUEST
+// ======================================================
 
+router.patch(
+	"/blood-requests/:requestId/verify",
+	auth("ADMIN"),
+	AdminController.verifyBloodRequest,
+);
 // ======================================================
 // APPROVE DONOR
 // ======================================================

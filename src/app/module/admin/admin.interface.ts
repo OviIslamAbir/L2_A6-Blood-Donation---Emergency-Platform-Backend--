@@ -27,3 +27,7 @@ export interface IDeleteUserPayload {
 	userId: string;
 	adminId: string;
 }
+export interface IVerifyBloodRequestPayload {
+	requestId: string;
+	adminId: string;
+}

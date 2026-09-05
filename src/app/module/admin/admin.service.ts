@@ -1,6 +1,7 @@
 import {
 	DonorApplicationStatus,
 	NotificationType,
+		RequestStatus,
 	Role,
 } from "../../../generated/prisma/enums";
 
@@ -17,6 +18,7 @@ import type {
 	IGetUsersQuery,
 	IUpdateUserStatusPayload,
 	IDeleteUserPayload,
+	IVerifyBloodRequestPayload,
 } from "./admin.interface";
 
 // ======================================================
@@ -511,6 +513,88 @@ const deleteUser = async (payload: IDeleteUserPayload) => {
 		user: deletedUser,
 	};
 };
+// ======================================================
+// VERIFY BLOOD REQUEST
+// ======================================================
+
+const verifyBloodRequest = async (
+	payload: IVerifyBloodRequestPayload,
+) => {
+	const bloodRequest = await prisma.bloodRequest.findUnique({
+		where: {
+			id: payload.requestId,
+		},
+
+		include: {
+			requester: {
+				select: {
+					id: true,
+					name: true,
+					email: true,
+					isActive: true,
+					deletedAt: true,
+				},
+			},
+		},
+	});
+
+	if (!bloodRequest) {
+		throw new Error("Blood request not found.");
+	}
+
+	if (bloodRequest.deletedAt) {
+		throw new Error("This blood request has been deleted.");
+	}
+
+	if (bloodRequest.status !== RequestStatus.PENDING) {
+		throw new Error(
+			"Only pending blood requests can be verified.",
+		);
+	}
+
+	if (bloodRequest.requester.deletedAt) {
+		throw new Error("The requester account has been deleted.");
+	}
+
+	if (!bloodRequest.requester.isActive) {
+		throw new Error("The requester account is inactive.");
+	}
+
+	const verifiedAt = new Date();
+
+	const verifiedRequest = await prisma.$transaction(async (tx) => {
+		const updatedRequest = await tx.bloodRequest.update({
+			where: {
+				id: bloodRequest.id,
+			},
+
+			data: {
+				status: RequestStatus.VERIFIED,
+				verifiedAt,
+				verifiedBy: payload.adminId,
+			},
+		});
+
+		await tx.notification.create({
+			data: {
+				userId: bloodRequest.requesterId,
+
+				title: "🩸 Blood Request Verified",
+
+				message: `Your blood request for ${bloodRequest.patientName} at ${bloodRequest.hospitalName} has been verified by an administrator.`,
+
+				type: NotificationType.REQUEST_VERIFIED,
+			},
+		});
+
+		return updatedRequest;
+	});
+
+	return {
+		message: "Blood request verified successfully.",
+		bloodRequest: verifiedRequest,
+	};
+};
 
 // ======================================================
 // DASHBOARD
@@ -614,6 +698,7 @@ export const AdminService = {
 	getPendingDonorApplications,
 	approveDonorApplication,
 	rejectDonorApplication,
+	verifyBloodRequest,
 	getAllUsers,
 	getSingleUser,
 	updateUserStatus,
