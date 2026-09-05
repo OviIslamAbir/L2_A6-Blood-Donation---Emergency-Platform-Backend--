@@ -25,4 +25,12 @@ export default {
 	smtp_password: process.env.SMTP_PASSWORD!,
 	smtp_user: process.env.SMTP_USER!,
 	email_sender: process.env.EMAIL_SENDER!,
+	stripe_secret_key: process.env.STRIPE_SECRET_KEY!,
+	stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET!,
+	bkash_base_url : process.env.BKASH_BASE_URL!,
+	bkash_username : process.env.BKASH_USERNAME!,
+	bkash_password : process.env.BKASH_PASSWORD!,
+	bkash_app_key : process.env.BKASH_APP_KEY!,
+	bkash_app_secret : process.env.BKASH_APP_SECRET!,
+	bkash_callback_url: process.env.BKASH_CALLBACK_URL!,
 };
