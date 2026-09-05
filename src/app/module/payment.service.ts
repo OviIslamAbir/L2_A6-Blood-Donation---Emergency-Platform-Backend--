@@ -11,6 +11,8 @@ import { prisma } from "../lib/prisma";
 import { getBkashIdToken } from "../lib/bkash";
 import { AppError } from "../utils/apiError";
 
+
+
 import {
 	NotificationType,
 	PaymentProvider,
@@ -18,6 +20,7 @@ import {
 	Role,
 	RequestStatus,
 } from "../../generated/prisma/enums";
+import { AuditLogServices } from "./auditLog/auditLog.service";
 
 const stripe = new Stripe(
 	config.stripe_secret_key,
@@ -131,7 +134,10 @@ const createPayment = async (
 		);
 	}
 
-	// Cancelled/rejected request cannot be paid.
+	// ================================================
+	// REQUEST STATUS
+	// ================================================
+
 	if (
 		bloodRequest.status ===
 			RequestStatus.CANCELLED ||
@@ -145,13 +151,11 @@ const createPayment = async (
 	}
 
 	/*
-	 * IMPORTANT:
+	 * COMPLETED is intentionally allowed.
 	 *
-	 * COMPLETED is allowed here because your project flow is:
+	 * Project flow:
 	 *
 	 * Donation → Payment → Audit Log
-	 *
-	 * DonationService may already mark the request COMPLETED.
 	 */
 
 	// ================================================
@@ -180,7 +184,7 @@ const createPayment = async (
 	}
 
 	// ================================================
-	// CREATE DB PAYMENT
+	// CREATE DATABASE PAYMENT
 	// ================================================
 
 	const payment =
@@ -194,6 +198,31 @@ const createPayment = async (
 				status: PaymentStatus.PENDING,
 			},
 		});
+
+	// ================================================
+	// AUDIT LOG - PAYMENT CREATED
+	// ================================================
+
+	await AuditLogServices.createAuditLog({
+		userId,
+
+		action: "PAYMENT_CREATED",
+
+		entity: "Payment",
+
+		entityId: payment.id,
+
+		oldValue: null,
+
+		newValue: {
+			paymentId: payment.id,
+			requestId: payment.requestId,
+			amount: amount.toString(),
+			currency: "BDT",
+			provider,
+			status: PaymentStatus.PENDING,
+		},
+	});
 
 	// ==================================================
 	// STRIPE
@@ -316,13 +345,6 @@ const createPayment = async (
 			const token =
 				await getBkashIdToken();
 
-			/*
-			 * Include our own paymentId in callback URL.
-			 *
-			 * bKash can then redirect back to our backend,
-			 * and our backend redirects to frontend.
-			 */
-
 			const callbackUrl =
 				`${config.bkash_callback_url}?paymentId=${encodeURIComponent(payment.id)}`;
 
@@ -389,6 +411,38 @@ const createPayment = async (
 					},
 				});
 
+				// ==========================================
+				// AUDIT LOG - BKASH CREATE FAILED
+				// ==========================================
+
+				await AuditLogServices.createAuditLog({
+					userId,
+
+					action:
+						"BKASH_PAYMENT_FAILED",
+
+					entity: "Payment",
+
+					entityId: payment.id,
+
+					oldValue: {
+						status:
+							PaymentStatus.PENDING,
+					},
+
+					newValue: {
+						status:
+							PaymentStatus.FAILED,
+
+						provider:
+							PaymentProvider.BKASH,
+
+						error:
+							result.statusMessage ||
+							"Failed to create bKash payment.",
+					},
+				});
+
 				throw new AppError(
 					httpStatus.BAD_GATEWAY,
 					result.statusMessage ||
@@ -396,7 +450,10 @@ const createPayment = async (
 				);
 			}
 
-			// Save bKash paymentID
+			// ==========================================
+			// SAVE BKASH PAYMENT ID
+			// ==========================================
+
 			await prisma.payment.update({
 				where: {
 					id: payment.id,
@@ -405,6 +462,44 @@ const createPayment = async (
 				data: {
 					transactionId:
 						result.paymentID,
+				},
+			});
+
+			// ==========================================
+			// AUDIT LOG - BKASH CREATED
+			// ==========================================
+
+			await AuditLogServices.createAuditLog({
+				userId,
+
+				action:
+					"BKASH_PAYMENT_CREATED",
+
+				entity: "Payment",
+
+				entityId: payment.id,
+
+				oldValue: {
+					status:
+						PaymentStatus.PENDING,
+
+					transactionId: null,
+				},
+
+				newValue: {
+					status:
+						PaymentStatus.PENDING,
+
+					transactionId:
+						result.paymentID,
+
+					provider:
+						PaymentProvider.BKASH,
+
+					amount:
+						amount.toString(),
+
+					currency: "BDT",
 				},
 			});
 
@@ -437,6 +532,34 @@ const createPayment = async (
 							PaymentStatus.FAILED,
 					},
 				});
+
+				await AuditLogServices.createAuditLog({
+					userId,
+
+					action:
+						"BKASH_PAYMENT_FAILED",
+
+					entity: "Payment",
+
+					entityId: payment.id,
+
+					oldValue: {
+						status:
+							PaymentStatus.PENDING,
+					},
+
+					newValue: {
+						status:
+							PaymentStatus.FAILED,
+
+						provider:
+							PaymentProvider.BKASH,
+
+						error:
+							error?.message ||
+							"Failed to create bKash payment.",
+					},
+				});
 			} catch {}
 
 			throw new AppError(
@@ -459,6 +582,29 @@ const createPayment = async (
 		data: {
 			status:
 				PaymentStatus.FAILED,
+		},
+	});
+
+	await AuditLogServices.createAuditLog({
+		userId,
+
+		action:
+			"PAYMENT_FAILED",
+
+		entity: "Payment",
+
+		entityId: payment.id,
+
+		oldValue: {
+			status:
+				PaymentStatus.PENDING,
+		},
+
+		newValue: {
+			status:
+				PaymentStatus.FAILED,
+
+			provider,
 		},
 	});
 
@@ -507,13 +653,20 @@ const executeBkashPayment = async (
 		);
 	}
 
-	// Already paid
+	// ================================================
+	// ALREADY PAID
+	// ================================================
+
 	if (
 		payment.status ===
 		PaymentStatus.PAID
 	) {
 		return payment;
 	}
+
+	// ================================================
+	// MUST BE PENDING
+	// ================================================
 
 	if (
 		payment.status !==
@@ -525,7 +678,10 @@ const executeBkashPayment = async (
 		);
 	}
 
-	// bKash paymentID stored in transactionId
+	// ================================================
+	// VERIFY BKASH PAYMENT ID
+	// ================================================
+
 	if (
 		!payment.transactionId ||
 		payment.transactionId !==
@@ -594,6 +750,31 @@ const executeBkashPayment = async (
 			},
 		});
 
+		await AuditLogServices.createAuditLog({
+			userId,
+
+			action:
+				"BKASH_PAYMENT_FAILED",
+
+			entity: "Payment",
+
+			entityId: payment.id,
+
+			oldValue: {
+				status:
+					PaymentStatus.PENDING,
+			},
+
+			newValue: {
+				status:
+					PaymentStatus.FAILED,
+
+				error:
+					result.statusMessage ||
+					"bKash payment execution failed.",
+			},
+		});
+
 		throw new AppError(
 			httpStatus.BAD_GATEWAY,
 			result.statusMessage ||
@@ -622,6 +803,37 @@ const executeBkashPayment = async (
 			},
 		});
 
+		await AuditLogServices.createAuditLog({
+			userId,
+
+			action:
+				"BKASH_PAYMENT_FAILED",
+
+			entity: "Payment",
+
+			entityId: payment.id,
+
+			oldValue: {
+				status:
+					PaymentStatus.PENDING,
+			},
+
+			newValue: {
+				status:
+					PaymentStatus.FAILED,
+
+				transactionStatus:
+					result.transactionStatus,
+
+				statusCode:
+					result.statusCode,
+
+				error:
+					result.statusMessage ||
+					"bKash payment was not completed.",
+			},
+		});
+
 		throw new AppError(
 			httpStatus.BAD_REQUEST,
 			result.statusMessage ||
@@ -630,7 +842,7 @@ const executeBkashPayment = async (
 	}
 
 	// ================================================
-	// UPDATE PAYMENT + NOTIFICATION
+	// PAYMENT SUCCESS
 	// ================================================
 
 	const updatedPayment =
@@ -650,6 +862,7 @@ const executeBkashPayment = async (
 					);
 				}
 
+				// Duplicate protection
 				if (
 					currentPayment.status ===
 					PaymentStatus.PAID
@@ -696,6 +909,44 @@ const executeBkashPayment = async (
 			},
 		);
 
+	// ================================================
+	// AUDIT LOG - BKASH PAID
+	// ================================================
+
+	await AuditLogServices.createAuditLog({
+		userId,
+
+		action:
+			"BKASH_PAYMENT_PAID",
+
+		entity: "Payment",
+
+		entityId: payment.id,
+
+		oldValue: {
+			status:
+				PaymentStatus.PENDING,
+
+			transactionId:
+				payment.transactionId,
+		},
+
+		newValue: {
+			status:
+				PaymentStatus.PAID,
+
+			transactionId:
+				result.trxID ||
+				payment.transactionId,
+
+			provider:
+				PaymentProvider.BKASH,
+
+			paidAt:
+				updatedPayment.paidAt,
+		},
+	});
+
 	return updatedPayment;
 };
 
@@ -732,11 +983,12 @@ const bkashCallback = async (
 		);
 	}
 
-	/*
-	 * If bKash reports cancel/failure, don't execute.
-	 */
 	const normalizedStatus =
 		status?.toLowerCase();
+
+	// ================================================
+	// BKASH CANCEL / FAILURE
+	// ================================================
 
 	if (
 		normalizedStatus === "cancel" ||
@@ -758,13 +1010,49 @@ const bkashCallback = async (
 						PaymentStatus.CANCELLED,
 				},
 			});
+
+			// ==========================================
+			// AUDIT LOG - BKASH CANCELLED
+			// ==========================================
+
+			await AuditLogServices.createAuditLog({
+				userId:
+					payment.userId,
+
+				action:
+					"BKASH_PAYMENT_CANCELLED",
+
+				entity: "Payment",
+
+				entityId:
+					payment.id,
+
+				oldValue: {
+					status:
+						PaymentStatus.PENDING,
+				},
+
+				newValue: {
+					status:
+						PaymentStatus.CANCELLED,
+
+					bkashPaymentId:
+						bkashPaymentId ||
+						payment.transactionId,
+
+					callbackStatus:
+						status,
+				},
+			});
 		}
 
 		return {
 			paymentId,
+
 			bkashPaymentId:
 				bkashPaymentId ||
 				payment.transactionId,
+
 			status:
 				PaymentStatus.CANCELLED,
 		};
@@ -772,9 +1060,11 @@ const bkashCallback = async (
 
 	return {
 		paymentId,
+
 		bkashPaymentId:
 			bkashPaymentId ||
 			payment.transactionId,
+
 		status:
 			status || "success",
 	};
@@ -789,6 +1079,10 @@ const stripeWebhook = async (
 	signature: string,
 ) => {
 	let event: Stripe.Event;
+
+	// ================================================
+	// VERIFY SIGNATURE
+	// ================================================
 
 	try {
 		event =
@@ -806,6 +1100,10 @@ const stripeWebhook = async (
 			}`,
 		);
 	}
+
+	// ================================================
+	// EVENT HANDLING
+	// ================================================
 
 	switch (event.type) {
 		// ================================================
@@ -830,6 +1128,15 @@ const stripeWebhook = async (
 				break;
 			}
 
+			let paidPaymentUserId:
+				string | null = null;
+
+			let oldStatus:
+				PaymentStatus | null = null;
+
+			let newTransactionId:
+				string | null = null;
+
 			await prisma.$transaction(
 				async (tx) => {
 					const payment =
@@ -850,6 +1157,18 @@ const stripeWebhook = async (
 						return;
 					}
 
+					paidPaymentUserId =
+						payment.userId;
+
+					oldStatus =
+						payment.status;
+
+					newTransactionId =
+						typeof session.payment_intent ===
+						"string"
+							? session.payment_intent
+							: payment.transactionId;
+
 					await tx.payment.update({
 						where: {
 							id: paymentId,
@@ -860,10 +1179,7 @@ const stripeWebhook = async (
 								PaymentStatus.PAID,
 
 							transactionId:
-								typeof session.payment_intent ===
-								"string"
-									? session.payment_intent
-									: payment.transactionId,
+								newTransactionId,
 
 							paidAt:
 								new Date(),
@@ -888,6 +1204,45 @@ const stripeWebhook = async (
 				},
 			);
 
+			// ==========================================
+			// AUDIT LOG - STRIPE PAID
+			// ==========================================
+
+			if (paidPaymentUserId) {
+				await AuditLogServices.createAuditLog({
+					userId:
+						paidPaymentUserId,
+
+					action:
+						"STRIPE_PAYMENT_PAID",
+
+					entity:
+						"Payment",
+
+					entityId:
+						paymentId,
+
+					oldValue: {
+						status:
+							oldStatus,
+					},
+
+					newValue: {
+						status:
+							PaymentStatus.PAID,
+
+						transactionId:
+							newTransactionId,
+
+						provider:
+							PaymentProvider.STRIPE,
+
+						paidAt:
+							new Date(),
+					},
+				});
+			}
+
 			break;
 		}
 
@@ -905,6 +1260,12 @@ const stripeWebhook = async (
 			if (!paymentId) {
 				break;
 			}
+
+			let failedUserId:
+				string | null = null;
+
+			let previousStatus:
+				PaymentStatus | null = null;
 
 			await prisma.$transaction(
 				async (tx) => {
@@ -925,6 +1286,12 @@ const stripeWebhook = async (
 					) {
 						return;
 					}
+
+					failedUserId =
+						payment.userId;
+
+					previousStatus =
+						payment.status;
 
 					await tx.payment.update({
 						where: {
@@ -955,6 +1322,47 @@ const stripeWebhook = async (
 				},
 			);
 
+			// ==========================================
+			// AUDIT LOG - STRIPE FAILED
+			// ==========================================
+
+			if (failedUserId) {
+				await AuditLogServices.createAuditLog({
+					userId:
+						failedUserId,
+
+					action:
+						"STRIPE_PAYMENT_FAILED",
+
+					entity:
+						"Payment",
+
+					entityId:
+						paymentId,
+
+					oldValue: {
+						status:
+							previousStatus,
+					},
+
+					newValue: {
+						status:
+							PaymentStatus.FAILED,
+
+						provider:
+							PaymentProvider.STRIPE,
+
+						paymentIntentId:
+							paymentIntent.id,
+
+						error:
+							paymentIntent.last_payment_error
+								?.message ||
+							"Stripe payment failed.",
+					},
+				});
+			}
+
 			break;
 		}
 
@@ -973,19 +1381,66 @@ const stripeWebhook = async (
 				break;
 			}
 
-			await prisma.payment.updateMany({
+			const payment =
+				await prisma.payment.findUnique({
+					where: {
+						id: paymentId,
+					},
+				});
+
+			if (!payment) {
+				break;
+			}
+
+			if (
+				payment.status ===
+				PaymentStatus.PAID
+			) {
+				break;
+			}
+
+			await prisma.payment.update({
 				where: {
 					id: paymentId,
-
-					status: {
-						not:
-							PaymentStatus.PAID,
-					},
 				},
 
 				data: {
 					status:
 						PaymentStatus.FAILED,
+				},
+			});
+
+			// ==========================================
+			// AUDIT LOG - STRIPE EXPIRED
+			// ==========================================
+
+			await AuditLogServices.createAuditLog({
+				userId:
+					payment.userId,
+
+				action:
+					"STRIPE_PAYMENT_EXPIRED",
+
+				entity:
+					"Payment",
+
+				entityId:
+					payment.id,
+
+				oldValue: {
+					status:
+						payment.status,
+				},
+
+				newValue: {
+					status:
+						PaymentStatus.FAILED,
+
+					provider:
+						PaymentProvider.STRIPE,
+
+					sessionId:
+						session.id,
 				},
 			});
 
@@ -1082,6 +1537,10 @@ const getSinglePayment = async (
 
 	return payment;
 };
+
+// ======================================================
+// EXPORT
+// ======================================================
 
 export const PaymentServices = {
 	createPayment,

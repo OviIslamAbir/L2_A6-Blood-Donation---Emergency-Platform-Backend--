@@ -19,6 +19,7 @@ import { DonorMatchRoutes } from "./app/module/donorMatch/donorMatch.route";
 import { NotificationRoutes } from "./app/module/notification/notification.route";
 import { DonationRoutes } from "./app/module/donation/donation.route";
 import { PaymentRoutes } from "./app/module/payment.route";
+import { AuditLogRoutes } from "./app/module/auditLog/auditLog.route";
 
 const app: Application = express();
 
@@ -78,6 +79,10 @@ app.use("/api/v1/notifications", NotificationRoutes);
 app.use("/api/v1/donations", DonationRoutes);
 
 app.use("/api/v1/payments", PaymentRoutes);
+app.use(
+	"/api/v1/audit-logs",
+	AuditLogRoutes,
+);	
 
 // ======================================================
 // BASIC ROUTE
