@@ -6,7 +6,8 @@ const createPaymentSchema = z.object({
 
 		amount: z
 			.number()
-			.positive("Amount must be greater than 0."),
+			.positive("Amount must be greater than 0.")
+			.max(1_000_000, "Amount is too large."),
 
 		provider: z.enum(["STRIPE", "BKASH"]),
 	}),
@@ -18,7 +19,9 @@ const bkashExecuteSchema = z.object({
 
 		bkashPaymentId: z
 			.string()
-			.min(1, "bKash payment ID is required."),
+			.trim()
+			.min(1, "bKash payment ID is required.")
+			.max(100, "Invalid bKash payment ID."),
 	}),
 });
 

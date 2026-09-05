@@ -1,18 +1,27 @@
 import Stripe from "stripe";
 import httpStatus from "http-status";
 
-
 import type {
 	ICreatePaymentPayload,
 	IBkashExecutePayload,
 } from "./payment.interface";
+
 import config from "../config";
 import { prisma } from "../lib/prisma";
-import { AppError } from "../utils/apiError";
-import { NotificationType, PaymentProvider, PaymentStatus, RequestStatus, Role } from "../../generated/prisma/browser";
 import { getBkashIdToken } from "../lib/bkash";
+import { AppError } from "../utils/apiError";
 
-const stripe = new Stripe(config.stripe_secret_key);
+import {
+	NotificationType,
+	PaymentProvider,
+	PaymentStatus,
+	Role,
+	RequestStatus,
+} from "../../generated/prisma/enums";
+
+const stripe = new Stripe(
+	config.stripe_secret_key,
+);
 
 // ======================================================
 // CREATE PAYMENT
@@ -22,17 +31,36 @@ const createPayment = async (
 	userId: string,
 	payload: ICreatePaymentPayload,
 ) => {
-	const { requestId, amount, provider } = payload;
+	const {
+		requestId,
+		amount,
+		provider,
+	} = payload;
 
-	// ==================================================
-	// CHECK USER
-	// ==================================================
+	// ================================================
+	// VALIDATE AMOUNT
+	// ================================================
 
-	const user = await prisma.user.findUnique({
-		where: {
-			id: userId,
-		},
-	});
+	if (
+		!Number.isFinite(amount) ||
+		amount <= 0
+	) {
+		throw new AppError(
+			httpStatus.BAD_REQUEST,
+			"Payment amount must be greater than 0.",
+		);
+	}
+
+	// ================================================
+	// USER
+	// ================================================
+
+	const user =
+		await prisma.user.findUnique({
+			where: {
+				id: userId,
+			},
+		});
 
 	if (!user) {
 		throw new AppError(
@@ -69,9 +97,9 @@ const createPayment = async (
 		);
 	}
 
-	// ==================================================
-	// CHECK BLOOD REQUEST
-	// ==================================================
+	// ================================================
+	// BLOOD REQUEST
+	// ================================================
 
 	const bloodRequest =
 		await prisma.bloodRequest.findUnique({
@@ -87,16 +115,28 @@ const createPayment = async (
 		);
 	}
 
-	if (bloodRequest.requesterId !== userId) {
+	if (bloodRequest.deletedAt) {
+		throw new AppError(
+			httpStatus.BAD_REQUEST,
+			"This blood request has been deleted.",
+		);
+	}
+
+	if (
+		bloodRequest.requesterId !== userId
+	) {
 		throw new AppError(
 			httpStatus.FORBIDDEN,
 			"You can only pay for your own blood request.",
 		);
 	}
 
+	// Cancelled/rejected request cannot be paid.
 	if (
-		bloodRequest.status === RequestStatus.CANCELLED ||
-		bloodRequest.status === RequestStatus.REJECTED
+		bloodRequest.status ===
+			RequestStatus.CANCELLED ||
+		bloodRequest.status ===
+			RequestStatus.REJECTED
 	) {
 		throw new AppError(
 			httpStatus.BAD_REQUEST,
@@ -104,16 +144,19 @@ const createPayment = async (
 		);
 	}
 
-	if (bloodRequest.status === RequestStatus.COMPLETED) {
-		throw new AppError(
-			httpStatus.BAD_REQUEST,
-			"This blood request has already been completed.",
-		);
-	}
+	/*
+	 * IMPORTANT:
+	 *
+	 * COMPLETED is allowed here because your project flow is:
+	 *
+	 * Donation → Payment → Audit Log
+	 *
+	 * DonationService may already mark the request COMPLETED.
+	 */
 
-	// ==================================================
-	// CHECK EXISTING PAYMENT
-	// ==================================================
+	// ================================================
+	// EXISTING PAYMENT
+	// ================================================
 
 	const existingPayment =
 		await prisma.payment.findFirst({
@@ -136,81 +179,128 @@ const createPayment = async (
 		);
 	}
 
-	// ==================================================
-	// CREATE DATABASE PAYMENT
-	// ==================================================
+	// ================================================
+	// CREATE DB PAYMENT
+	// ================================================
 
-	const payment = await prisma.payment.create({
-		data: {
-			userId,
-			requestId,
-			amount,
-			currency: "BDT",
-			provider,
-			status: PaymentStatus.PENDING,
-		},
-	});
+	const payment =
+		await prisma.payment.create({
+			data: {
+				userId,
+				requestId,
+				amount,
+				currency: "BDT",
+				provider,
+				status: PaymentStatus.PENDING,
+			},
+		});
 
 	// ==================================================
 	// STRIPE
 	// ==================================================
 
-	if (provider === PaymentProvider.STRIPE) {
+	if (
+		provider === PaymentProvider.STRIPE
+	) {
 		try {
+			const amountInPaisa =
+				Math.round(amount * 100);
+
+			if (amountInPaisa < 1) {
+				throw new AppError(
+					httpStatus.BAD_REQUEST,
+					"Invalid payment amount.",
+				);
+			}
+
 			const session =
-				await stripe.checkout.sessions.create({
-					mode: "payment",
+				await stripe.checkout.sessions.create(
+					{
+						mode: "payment",
 
-					payment_method_types: ["card"],
+						payment_method_types: [
+							"card",
+						],
 
-					line_items: [
-						{
-							quantity: 1,
+						line_items: [
+							{
+								quantity: 1,
 
-							price_data: {
-								currency: "bdt",
+								price_data: {
+									currency: "bdt",
 
-								unit_amount:
-									Math.round(amount * 100),
+									unit_amount:
+										amountInPaisa,
 
-								product_data: {
-									name: "Blood Donation Assistance Payment",
+									product_data: {
+										name:
+											"Blood Donation Assistance Payment",
 
-									description: `Payment for blood request ${requestId}`,
+										description:
+											`Payment for blood request ${requestId}`,
+									},
 								},
 							},
+						],
+
+						metadata: {
+							paymentId:
+								payment.id,
+
+							requestId,
+
+							userId,
 						},
-					],
 
-					metadata: {
-						paymentId: payment.id,
-						requestId,
-						userId,
+						payment_intent_data: {
+							metadata: {
+								paymentId:
+									payment.id,
+
+								requestId,
+
+								userId,
+							},
+						},
+
+						success_url:
+							`${config.bak_url}/api/v1/payments/payment-success?paymentId=${payment.id}`,
+
+						cancel_url:
+							`${config.bak_url}/api/v1/payments/payment-cancel?paymentId=${payment.id}`,
 					},
-
-					success_url:
-						`${config.bak_url}/api/v1/payments/payment-success?paymentId=${payment.id}`,
-
-					cancel_url:
-						`${config.bak_url}/api/v1/payments/payment-cancel`,
-				});
+				);
 
 			return {
-				paymentId: payment.id,
-				provider: PaymentProvider.STRIPE,
-				checkoutUrl: session.url,
-				sessionId: session.id,
+				paymentId:
+					payment.id,
+
+				provider:
+					PaymentProvider.STRIPE,
+
+				checkoutUrl:
+					session.url,
+
+				sessionId:
+					session.id,
 			};
 		} catch (error: any) {
-			await prisma.payment.delete({
-				where: {
-					id: payment.id,
-				},
-			});
+			try {
+				await prisma.payment.delete({
+					where: {
+						id: payment.id,
+					},
+				});
+			} catch {}
+
+			if (error instanceof AppError) {
+				throw error;
+			}
 
 			throw new AppError(
 				httpStatus.INTERNAL_SERVER_ERROR,
-				`Failed to create Stripe checkout session: ${error.message}`,
+				error?.message ||
+					"Failed to create Stripe checkout session.",
 			);
 		}
 	}
@@ -219,53 +309,83 @@ const createPayment = async (
 	// BKASH
 	// ==================================================
 
-	if (provider === PaymentProvider.BKASH) {
+	if (
+		provider === PaymentProvider.BKASH
+	) {
 		try {
-			const token = await getBkashIdToken();
+			const token =
+				await getBkashIdToken();
 
-			const response = await fetch(
-				`${config.bkash_base_url}/tokenized/checkout/create`,
-				{
-					method: "POST",
+			/*
+			 * Include our own paymentId in callback URL.
+			 *
+			 * bKash can then redirect back to our backend,
+			 * and our backend redirects to frontend.
+			 */
 
-					headers: {
-						"Content-Type": "application/json",
-						Accept: "application/json",
-						Authorization: token,
-						"X-App-Key": config.bkash_app_key,
+			const callbackUrl =
+				`${config.bkash_callback_url}?paymentId=${encodeURIComponent(payment.id)}`;
+
+			const response =
+				await fetch(
+					`${config.bkash_base_url}/tokenized/checkout/create`,
+					{
+						method: "POST",
+
+						headers: {
+							"Content-Type":
+								"application/json",
+
+							Accept:
+								"application/json",
+
+							Authorization:
+								token,
+
+							"X-App-Key":
+								config.bkash_app_key,
+						},
+
+						body: JSON.stringify({
+							mode: "001",
+
+							payerReference:
+								user.phone ||
+								user.email,
+
+							callbackURL:
+								callbackUrl,
+
+							amount:
+								amount.toFixed(2),
+
+							currency:
+								"BDT",
+
+							intent:
+								"sale",
+
+							merchantInvoiceNumber:
+								`BLOOD-${payment.id}`,
+						}),
 					},
+				);
 
-					body: JSON.stringify({
-						mode: "001",
+			const result =
+				await response.json();
 
-						payerReference:
-							user.phone || user.email,
-
-						callbackURL:
-							config.bkash_callback_url,
-
-						amount: amount.toFixed(2),
-
-						currency: "BDT",
-
-						intent: "sale",
-
-						merchantInvoiceNumber:
-							`BLOOD-${payment.id}`,
-					}),
-				},
-			);
-
-			const result = await response.json();
-
-			if (!response.ok || !result.paymentID) {
+			if (
+				!response.ok ||
+				!result.paymentID
+			) {
 				await prisma.payment.update({
 					where: {
 						id: payment.id,
 					},
 
 					data: {
-						status: PaymentStatus.FAILED,
+						status:
+							PaymentStatus.FAILED,
 					},
 				});
 
@@ -276,38 +396,71 @@ const createPayment = async (
 				);
 			}
 
-			// Store bKash payment ID
+			// Save bKash paymentID
 			await prisma.payment.update({
 				where: {
 					id: payment.id,
 				},
 
 				data: {
-					transactionId: result.paymentID,
+					transactionId:
+						result.paymentID,
 				},
 			});
 
 			return {
-				paymentId: payment.id,
+				paymentId:
+					payment.id,
 
-				provider: PaymentProvider.BKASH,
+				provider:
+					PaymentProvider.BKASH,
 
-				bkashPaymentId: result.paymentID,
+				bkashPaymentId:
+					result.paymentID,
 
-				bkashUrl: result.bkashURL,
+				bkashUrl:
+					result.bkashURL,
 			};
 		} catch (error: any) {
 			if (error instanceof AppError) {
 				throw error;
 			}
 
+			try {
+				await prisma.payment.update({
+					where: {
+						id: payment.id,
+					},
+
+					data: {
+						status:
+							PaymentStatus.FAILED,
+					},
+				});
+			} catch {}
+
 			throw new AppError(
 				httpStatus.BAD_GATEWAY,
-				error.message ||
+				error?.message ||
 					"Failed to create bKash payment.",
 			);
 		}
 	}
+
+	// ================================================
+	// UNSUPPORTED PROVIDER
+	// ================================================
+
+	await prisma.payment.update({
+		where: {
+			id: payment.id,
+		},
+
+		data: {
+			status:
+				PaymentStatus.FAILED,
+		},
+	});
 
 	throw new AppError(
 		httpStatus.BAD_REQUEST,
@@ -323,15 +476,12 @@ const executeBkashPayment = async (
 	userId: string,
 	payload: IBkashExecutePayload,
 ) => {
-	const payment = await prisma.payment.findUnique({
-		where: {
-			id: payload.paymentId,
-		},
-
-		include: {
-			request: true,
-		},
-	});
+	const payment =
+		await prisma.payment.findUnique({
+			where: {
+				id: payload.paymentId,
+			},
+		});
 
 	if (!payment) {
 		throw new AppError(
@@ -347,41 +497,103 @@ const executeBkashPayment = async (
 		);
 	}
 
-	if (payment.provider !== PaymentProvider.BKASH) {
+	if (
+		payment.provider !==
+		PaymentProvider.BKASH
+	) {
 		throw new AppError(
 			httpStatus.BAD_REQUEST,
 			"This is not a bKash payment.",
 		);
 	}
 
-	if (payment.status === PaymentStatus.PAID) {
+	// Already paid
+	if (
+		payment.status ===
+		PaymentStatus.PAID
+	) {
 		return payment;
 	}
 
-	const token = await getBkashIdToken();
+	if (
+		payment.status !==
+		PaymentStatus.PENDING
+	) {
+		throw new AppError(
+			httpStatus.BAD_REQUEST,
+			"This payment cannot be executed.",
+		);
+	}
 
-	const response = await fetch(
-		`${config.bkash_base_url}/tokenized/checkout/execute`,
-		{
-			method: "POST",
+	// bKash paymentID stored in transactionId
+	if (
+		!payment.transactionId ||
+		payment.transactionId !==
+			payload.bkashPaymentId
+	) {
+		throw new AppError(
+			httpStatus.BAD_REQUEST,
+			"Invalid bKash payment ID.",
+		);
+	}
 
-			headers: {
-				"Content-Type": "application/json",
-				Accept: "application/json",
-				Authorization: token,
-				"X-App-Key": config.bkash_app_key,
+	// ================================================
+	// TOKEN
+	// ================================================
+
+	const token =
+		await getBkashIdToken();
+
+	// ================================================
+	// EXECUTE
+	// ================================================
+
+	const response =
+		await fetch(
+			`${config.bkash_base_url}/tokenized/checkout/execute`,
+			{
+				method: "POST",
+
+				headers: {
+					"Content-Type":
+						"application/json",
+
+					Accept:
+						"application/json",
+
+					Authorization:
+						token,
+
+					"X-App-Key":
+						config.bkash_app_key,
+				},
+
+				body: JSON.stringify({
+					paymentID:
+						payment.transactionId,
+				}),
 			},
+		);
 
-			body: JSON.stringify({
-				paymentID:
-					payload.bkashPaymentId,
-			}),
-		},
-	);
+	const result =
+		await response.json();
 
-	const result = await response.json();
+	// ================================================
+	// API ERROR
+	// ================================================
 
 	if (!response.ok) {
+		await prisma.payment.update({
+			where: {
+				id: payment.id,
+			},
+
+			data: {
+				status:
+					PaymentStatus.FAILED,
+			},
+		});
+
 		throw new AppError(
 			httpStatus.BAD_GATEWAY,
 			result.statusMessage ||
@@ -389,10 +601,27 @@ const executeBkashPayment = async (
 		);
 	}
 
-	if (
-		result.transactionStatus !== "Completed" &&
-		result.statusCode !== "0000"
-	) {
+	// ================================================
+	// CHECK SUCCESS
+	// ================================================
+
+	const isCompleted =
+		result.transactionStatus ===
+			"Completed" ||
+		result.statusCode === "0000";
+
+	if (!isCompleted) {
+		await prisma.payment.update({
+			where: {
+				id: payment.id,
+			},
+
+			data: {
+				status:
+					PaymentStatus.FAILED,
+			},
+		});
+
 		throw new AppError(
 			httpStatus.BAD_REQUEST,
 			result.statusMessage ||
@@ -400,46 +629,155 @@ const executeBkashPayment = async (
 		);
 	}
 
-	// ==================================================
-	// PAYMENT SUCCESS
-	// ==================================================
+	// ================================================
+	// UPDATE PAYMENT + NOTIFICATION
+	// ================================================
 
 	const updatedPayment =
-		await prisma.$transaction(async (tx: any) => {
-			const updated =
-				await tx.payment.update({
-					where: {
-						id: payment.id,
-					},
+		await prisma.$transaction(
+			async (tx) => {
+				const currentPayment =
+					await tx.payment.findUnique({
+						where: {
+							id: payment.id,
+						},
+					});
 
+				if (!currentPayment) {
+					throw new AppError(
+						httpStatus.NOT_FOUND,
+						"Payment not found.",
+					);
+				}
+
+				if (
+					currentPayment.status ===
+					PaymentStatus.PAID
+				) {
+					return currentPayment;
+				}
+
+				const updated =
+					await tx.payment.update({
+						where: {
+							id: payment.id,
+						},
+
+						data: {
+							status:
+								PaymentStatus.PAID,
+
+							transactionId:
+								result.trxID ||
+								currentPayment.transactionId,
+
+							paidAt:
+								new Date(),
+						},
+					});
+
+				await tx.notification.create({
 					data: {
-						status: PaymentStatus.PAID,
+						userId:
+							currentPayment.userId,
 
-						transactionId:
-							result.trxID ||
-							payload.bkashPaymentId,
+						title:
+							"Payment Successful",
 
-						paidAt: new Date(),
+						message:
+							"Your bKash payment has been completed successfully.",
+
+						type:
+							NotificationType.PAYMENT,
 					},
 				});
 
-			await tx.notification.create({
-				data: {
-					userId: payment.userId,
-
-					title: "Payment Successful",
-
-					message:
-						"Your bKash payment has been completed successfully.",
-
-					type: NotificationType.PAYMENT,
-				},
-			});
-
-			return updated;
-		});
+				return updated;
+			},
+		);
 
 	return updatedPayment;
+};
+
+// ======================================================
+// BKASH CALLBACK
+// ======================================================
+
+const bkashCallback = async (
+	paymentId: string,
+	bkashPaymentId?: string,
+	status?: string,
+) => {
+	const payment =
+		await prisma.payment.findUnique({
+			where: {
+				id: paymentId,
+			},
+		});
+
+	if (!payment) {
+		throw new AppError(
+			httpStatus.NOT_FOUND,
+			"Payment not found.",
+		);
+	}
+
+	if (
+		payment.provider !==
+		PaymentProvider.BKASH
+	) {
+		throw new AppError(
+			httpStatus.BAD_REQUEST,
+			"This is not a bKash payment.",
+		);
+	}
+
+	/*
+	 * If bKash reports cancel/failure, don't execute.
+	 */
+	const normalizedStatus =
+		status?.toLowerCase();
+
+	if (
+		normalizedStatus === "cancel" ||
+		normalizedStatus === "cancelled" ||
+		normalizedStatus === "failure" ||
+		normalizedStatus === "failed"
+	) {
+		if (
+			payment.status ===
+			PaymentStatus.PENDING
+		) {
+			await prisma.payment.update({
+				where: {
+					id: payment.id,
+				},
+
+				data: {
+					status:
+						PaymentStatus.CANCELLED,
+				},
+			});
+		}
+
+		return {
+			paymentId,
+			bkashPaymentId:
+				bkashPaymentId ||
+				payment.transactionId,
+			status:
+				PaymentStatus.CANCELLED,
+		};
+	}
+
+	return {
+		paymentId,
+		bkashPaymentId:
+			bkashPaymentId ||
+			payment.transactionId,
+		status:
+			status || "success",
+	};
 };
 
 // ======================================================
@@ -453,21 +791,25 @@ const stripeWebhook = async (
 	let event: Stripe.Event;
 
 	try {
-		event = stripe.webhooks.constructEvent(
-			body,
-			signature,
-			config.stripe_webhook_secret,
-		);
+		event =
+			stripe.webhooks.constructEvent(
+				body,
+				signature,
+				config.stripe_webhook_secret,
+			);
 	} catch (error: any) {
 		throw new AppError(
 			httpStatus.BAD_REQUEST,
-			`Stripe Webhook Error: ${error.message}`,
+			`Stripe Webhook Error: ${
+				error?.message ||
+				"Invalid signature."
+			}`,
 		);
 	}
 
 	switch (event.type) {
 		// ================================================
-		// PAYMENT SUCCESS
+		// CHECKOUT COMPLETED
 		// ================================================
 
 		case "checkout.session.completed": {
@@ -478,63 +820,69 @@ const stripeWebhook = async (
 				session.metadata?.paymentId;
 
 			if (!paymentId) {
-				throw new AppError(
-					httpStatus.BAD_REQUEST,
-					"Payment ID not found in Stripe metadata.",
-				);
+				break;
 			}
 
-			const payment =
-				await prisma.payment.findUnique({
-					where: {
-						id: paymentId,
-					},
-				});
-
-			if (!payment) {
-				throw new AppError(
-					httpStatus.NOT_FOUND,
-					"Payment not found.",
-				);
-			}
-
-			// Prevent duplicate webhook
-			if (payment.status === PaymentStatus.PAID) {
-				return {
-					received: true,
-				};
+			if (
+				session.payment_status !==
+				"paid"
+			) {
+				break;
 			}
 
 			await prisma.$transaction(
-				async (tx: any) => {
+				async (tx) => {
+					const payment =
+						await tx.payment.findUnique({
+							where: {
+								id: paymentId,
+							},
+						});
+
+					if (!payment) {
+						return;
+					}
+
+					if (
+						payment.status ===
+						PaymentStatus.PAID
+					) {
+						return;
+					}
+
 					await tx.payment.update({
 						where: {
 							id: paymentId,
 						},
 
 						data: {
-							status: PaymentStatus.PAID,
+							status:
+								PaymentStatus.PAID,
 
 							transactionId:
 								typeof session.payment_intent ===
 								"string"
 									? session.payment_intent
-									: null,
+									: payment.transactionId,
 
-							paidAt: new Date(),
+							paidAt:
+								new Date(),
 						},
 					});
 
 					await tx.notification.create({
 						data: {
-							userId: payment.userId,
+							userId:
+								payment.userId,
 
-							title: "Payment Successful",
+							title:
+								"Payment Successful",
 
 							message:
 								"Your Stripe payment has been completed successfully.",
 
-							type: NotificationType.PAYMENT,
+							type:
+								NotificationType.PAYMENT,
 						},
 					});
 				},
@@ -544,7 +892,7 @@ const stripeWebhook = async (
 		}
 
 		// ================================================
-		// PAYMENT FAILED
+		// PAYMENT INTENT FAILED
 		// ================================================
 
 		case "payment_intent.payment_failed": {
@@ -558,39 +906,50 @@ const stripeWebhook = async (
 				break;
 			}
 
-			const payment =
-				await prisma.payment.findUnique({
-					where: {
-						id: paymentId,
-					},
-				});
-
-			if (!payment) {
-				break;
-			}
-
 			await prisma.$transaction(
-				async (tx: any) => {
+				async (tx) => {
+					const payment =
+						await tx.payment.findUnique({
+							where: {
+								id: paymentId,
+							},
+						});
+
+					if (!payment) {
+						return;
+					}
+
+					if (
+						payment.status ===
+						PaymentStatus.PAID
+					) {
+						return;
+					}
+
 					await tx.payment.update({
 						where: {
 							id: paymentId,
 						},
 
 						data: {
-							status: PaymentStatus.FAILED,
+							status:
+								PaymentStatus.FAILED,
 						},
 					});
 
 					await tx.notification.create({
 						data: {
-							userId: payment.userId,
+							userId:
+								payment.userId,
 
-							title: "Payment Failed",
+							title:
+								"Payment Failed",
 
 							message:
 								"Your Stripe payment could not be completed.",
 
-							type: NotificationType.PAYMENT,
+							type:
+								NotificationType.PAYMENT,
 						},
 					});
 				},
@@ -614,31 +973,21 @@ const stripeWebhook = async (
 				break;
 			}
 
-			const payment =
-				await prisma.payment.findUnique({
-					where: {
-						id: paymentId,
-					},
-				});
+			await prisma.payment.updateMany({
+				where: {
+					id: paymentId,
 
-			if (!payment) {
-				break;
-			}
-
-			if (
-				payment.status !==
-				PaymentStatus.PAID
-			) {
-				await prisma.payment.update({
-					where: {
-						id: paymentId,
+					status: {
+						not:
+							PaymentStatus.PAID,
 					},
+				},
 
-					data: {
-						status: PaymentStatus.FAILED,
-					},
-				});
-			}
+				data: {
+					status:
+						PaymentStatus.FAILED,
+				},
+			});
 
 			break;
 		}
@@ -659,34 +1008,31 @@ const stripeWebhook = async (
 const getMyPayments = async (
 	userId: string,
 ) => {
-	const payments =
-		await prisma.payment.findMany({
-			where: {
-				userId,
-			},
+	return await prisma.payment.findMany({
+		where: {
+			userId,
+		},
 
-			orderBy: {
-				createdAt: "desc",
-			},
+		orderBy: {
+			createdAt: "desc",
+		},
 
-			include: {
-				request: {
-					select: {
-						id: true,
-						patientName: true,
-						bloodGroup: true,
-						units: true,
-						hospitalName: true,
-						hospitalAddress: true,
-						urgency: true,
-						status: true,
-						neededAt: true,
-					},
+		include: {
+			request: {
+				select: {
+					id: true,
+					patientName: true,
+					bloodGroup: true,
+					units: true,
+					hospitalName: true,
+					hospitalAddress: true,
+					urgency: true,
+					status: true,
+					neededAt: true,
 				},
 			},
-		});
-
-	return payments;
+		},
+	});
 };
 
 // ======================================================
@@ -740,6 +1086,7 @@ const getSinglePayment = async (
 export const PaymentServices = {
 	createPayment,
 	executeBkashPayment,
+	bkashCallback,
 	stripeWebhook,
 	getMyPayments,
 	getSinglePayment,

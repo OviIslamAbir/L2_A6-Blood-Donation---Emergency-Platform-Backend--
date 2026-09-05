@@ -1,6 +1,5 @@
 import { PaymentProvider } from "../../generated/prisma/enums";
 
-
 export interface ICreatePaymentPayload {
 	requestId: string;
 	amount: number;
@@ -11,3 +10,4 @@ export interface IBkashExecutePayload {
 	paymentId: string;
 	bkashPaymentId: string;
 }
+

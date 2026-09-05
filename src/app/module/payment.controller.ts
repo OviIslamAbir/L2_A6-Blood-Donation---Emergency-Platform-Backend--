@@ -1,6 +1,9 @@
-import type { Request, Response } from "express";
-import httpStatus from "http-status";
+import type {
+	Request,
+	Response,
+} from "express";
 
+import httpStatus from "http-status";
 
 import { PaymentServices } from "./payment.service";
 import { catchAsync } from "../utils/catchAsync";
@@ -11,7 +14,10 @@ import { sendResponse } from "../utils/sendResponse";
 // ======================================================
 
 const createPayment = catchAsync(
-	async (req: Request, res: Response) => {
+	async (
+		req: Request,
+		res: Response,
+	) => {
 		const user = req.user!;
 
 		const result =
@@ -21,10 +27,14 @@ const createPayment = catchAsync(
 			);
 
 		sendResponse(res, {
-			statusCode: httpStatus.CREATED,
+			statusCode:
+				httpStatus.CREATED,
+
 			success: true,
+
 			message:
 				"Payment initiated successfully.",
+
 			data: result,
 		});
 	},
@@ -34,23 +44,90 @@ const createPayment = catchAsync(
 // BKASH EXECUTE
 // ======================================================
 
-const executeBkashPayment = catchAsync(
-	async (req: Request, res: Response) => {
-		const user = req.user!;
+const executeBkashPayment =
+	catchAsync(
+		async (
+			req: Request,
+			res: Response,
+		) => {
+			const user = req.user!;
 
-		const result =
-			await PaymentServices.executeBkashPayment(
-				user.userId,
-				req.body,
+			const result =
+				await PaymentServices.executeBkashPayment(
+					user.userId,
+					req.body,
+				);
+
+			sendResponse(res, {
+				statusCode:
+					httpStatus.OK,
+
+				success: true,
+
+				message:
+					"bKash payment completed successfully.",
+
+				data: result,
+			});
+		},
+	);
+
+// ======================================================
+// BKASH CALLBACK
+// ======================================================
+
+const bkashCallback = catchAsync(
+	async (
+		req: Request,
+		res: Response,
+	) => {
+		const paymentId =
+			req.query.paymentId as string;
+
+		const bkashPaymentId =
+			(req.query.paymentID ||
+				req.query.paymentIdFromBkash) as
+				| string
+				| undefined;
+
+		const status =
+			req.query.status as
+				| string
+				| undefined;
+
+		if (!paymentId) {
+			res.redirect(
+				`${process.env.FRONTEND_URL}/dashboard/requester/payments?payment=failed`,
 			);
 
-		sendResponse(res, {
-			statusCode: httpStatus.OK,
-			success: true,
-			message:
-				"bKash payment completed successfully.",
-			data: result,
-		});
+			return;
+		}
+
+		const result =
+			await PaymentServices.bkashCallback(
+				paymentId,
+				bkashPaymentId,
+				status,
+			);
+
+		const clientUrl =
+			process.env.FRONTEND_URL ||
+			"http://localhost:3000";
+
+		const params =
+			new URLSearchParams({
+				payment: "bkash",
+				paymentId:
+					result.paymentId,
+				bkashPaymentId:
+					result.bkashPaymentId || "",
+				status:
+					result.status || "",
+			});
+
+		res.redirect(
+			`${clientUrl}/dashboard/requester/payments?${params.toString()}`,
+		);
 	},
 );
 
@@ -59,7 +136,10 @@ const executeBkashPayment = catchAsync(
 // ======================================================
 
 const stripeWebhook = catchAsync(
-	async (req: Request, res: Response) => {
+	async (
+		req: Request,
+		res: Response,
+	) => {
 		const signature =
 			req.headers["stripe-signature"];
 
@@ -78,7 +158,9 @@ const stripeWebhook = catchAsync(
 				signature,
 			);
 
-		res.status(httpStatus.OK).json(result);
+		res.status(
+			httpStatus.OK,
+		).json(result);
 	},
 );
 
@@ -87,7 +169,10 @@ const stripeWebhook = catchAsync(
 // ======================================================
 
 const getMyPayments = catchAsync(
-	async (req: Request, res: Response) => {
+	async (
+		req: Request,
+		res: Response,
+	) => {
 		const user = req.user!;
 
 		const result =
@@ -96,10 +181,14 @@ const getMyPayments = catchAsync(
 			);
 
 		sendResponse(res, {
-			statusCode: httpStatus.OK,
+			statusCode:
+				httpStatus.OK,
+
 			success: true,
+
 			message:
 				"Payments retrieved successfully.",
+
 			data: result,
 		});
 	},
@@ -110,7 +199,10 @@ const getMyPayments = catchAsync(
 // ======================================================
 
 const getSinglePayment = catchAsync(
-	async (req: Request, res: Response) => {
+	async (
+		req: Request,
+		res: Response,
+	) => {
 		const user = req.user!;
 
 		const paymentId =
@@ -123,10 +215,14 @@ const getSinglePayment = catchAsync(
 			);
 
 		sendResponse(res, {
-			statusCode: httpStatus.OK,
+			statusCode:
+				httpStatus.OK,
+
 			success: true,
+
 			message:
 				"Payment retrieved successfully.",
+
 			data: result,
 		});
 	},
@@ -135,6 +231,7 @@ const getSinglePayment = catchAsync(
 export const PaymentController = {
 	createPayment,
 	executeBkashPayment,
+	bkashCallback,
 	stripeWebhook,
 	getMyPayments,
 	getSinglePayment,

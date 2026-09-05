@@ -1,22 +1,18 @@
 import { Router } from "express";
 
-;
-
 import { PaymentController } from "./payment.controller";
 import { paymentValidation } from "./payment.validation";
+
 import { auth } from "../middleware/checkAuth";
-import { Role } from "../../generated/prisma/browser";
 import { validateRequest } from "../middleware/validateRequest";
+
+import { Role } from "../../generated/prisma/enums";
 
 const router = Router();
 
 // ======================================================
 // STRIPE WEBHOOK
 // ======================================================
-
-// IMPORTANT:
-// This route must receive RAW body.
-// Do NOT let express.json() parse this request first.
 
 router.post(
 	"/stripe/webhook",
@@ -37,6 +33,18 @@ router.post(
 );
 
 // ======================================================
+// BKASH CALLBACK
+//
+// Public route.
+// bKash redirects the customer here after checkout.
+// ======================================================
+
+router.get(
+	"/bkash/callback",
+	PaymentController.bkashCallback,
+);
+
+// ======================================================
 // BKASH EXECUTE
 // ======================================================
 
@@ -50,33 +58,63 @@ router.post(
 );
 
 // ======================================================
-// PAYMENT SUCCESS
+// STRIPE SUCCESS
 // ======================================================
 
 router.get(
 	"/payment-success",
 	(req, res) => {
 		const clientUrl =
+			process.env.FRONTEND_URL ||
 			"http://localhost:3000";
 
+		const paymentId =
+			req.query.paymentId as
+				| string
+				| undefined;
+
+		const params =
+			new URLSearchParams({
+				payment: "success",
+
+				...(paymentId
+					? { paymentId }
+					: {}),
+			});
+
 		res.redirect(
-			`${clientUrl}/dashboard/requester/payments?payment=success`,
+			`${clientUrl}/dashboard/requester/payments?${params.toString()}`,
 		);
 	},
 );
 
 // ======================================================
-// PAYMENT CANCEL
+// STRIPE CANCEL
 // ======================================================
 
 router.get(
 	"/payment-cancel",
 	(req, res) => {
 		const clientUrl =
+			process.env.FRONTEND_URL ||
 			"http://localhost:3000";
 
+		const paymentId =
+			req.query.paymentId as
+				| string
+				| undefined;
+
+		const params =
+			new URLSearchParams({
+				payment: "cancelled",
+
+				...(paymentId
+					? { paymentId }
+					: {}),
+			});
+
 		res.redirect(
-			`${clientUrl}/dashboard/requester/payments?payment=cancelled`,
+			`${clientUrl}/dashboard/requester/payments?${params.toString()}`,
 		);
 	},
 );
