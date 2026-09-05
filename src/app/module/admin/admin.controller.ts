@@ -180,25 +180,23 @@ const deleteUser = catchAsync(async (req: Request, res: Response) => {
 // VERIFY BLOOD REQUEST
 // ======================================================
 
-const verifyBloodRequest = catchAsync(
-	async (req: Request, res: Response) => {
-		if (!req.user) {
-			throw new Error("User information is missing in the request.");
-		}
+const verifyBloodRequest = catchAsync(async (req: Request, res: Response) => {
+	if (!req.user) {
+		throw new Error("User information is missing in the request.");
+	}
 
-		const result = await AdminService.verifyBloodRequest({
-			requestId: String(req.params.requestId),
-			adminId: req.user.userId,
-		});
+	const result = await AdminService.verifyBloodRequest({
+		requestId: String(req.params.requestId),
+		adminId: req.user.userId,
+	});
 
-		sendResponse(res, {
-			statusCode: 200,
-			success: true,
-			message: result.message,
-			data: result.bloodRequest,
-		});
-	},
-);
+	sendResponse(res, {
+		statusCode: 200,
+		success: true,
+		message: result.message,
+		data: result.bloodRequest,
+	});
+});
 // ======================================================
 // EXPORT
 // ======================================================

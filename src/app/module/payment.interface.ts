@@ -1,4 +1,4 @@
-import { PaymentProvider } from "../../generated/prisma/enums";
+import type { PaymentProvider } from "../../generated/prisma/enums";
 
 export interface ICreatePaymentPayload {
 	requestId: string;
@@ -10,4 +10,3 @@ export interface IBkashExecutePayload {
 	paymentId: string;
 	bkashPaymentId: string;
 }
-

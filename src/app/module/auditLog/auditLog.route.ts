@@ -3,10 +3,8 @@ import { Router } from "express";
 import { AuditLogController } from "./auditLog.controller";
 import { auditLogValidation } from "./auditLog.validation";
 import { validateRequest } from "../../middleware/validateRequest";
-import { Role } from "../../../generated/prisma/browser";
+import { Role } from "../../../generated/prisma/enums";
 import { auth } from "../../middleware/checkAuth";
-
-
 
 const router = Router();
 
@@ -18,10 +16,8 @@ router.get(
 	"/",
 
 	auth(Role.ADMIN),
-    
-	validateRequest(
-		auditLogValidation.getAuditLogsSchema,
-	),
+
+	validateRequest(auditLogValidation.getAuditLogsSchema),
 
 	AuditLogController.getAuditLogs,
 );

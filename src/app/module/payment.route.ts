@@ -14,10 +14,7 @@ const router = Router();
 // STRIPE WEBHOOK
 // ======================================================
 
-router.post(
-	"/stripe/webhook",
-	PaymentController.stripeWebhook,
-);
+router.post("/stripe/webhook", PaymentController.stripeWebhook);
 
 // ======================================================
 // CREATE PAYMENT
@@ -26,9 +23,7 @@ router.post(
 router.post(
 	"/create",
 	auth(Role.REQUESTER),
-	validateRequest(
-		paymentValidation.createPaymentSchema,
-	),
+	validateRequest(paymentValidation.createPaymentSchema),
 	PaymentController.createPayment,
 );
 
@@ -39,10 +34,7 @@ router.post(
 // bKash redirects the customer here after checkout.
 // ======================================================
 
-router.get(
-	"/bkash/callback",
-	PaymentController.bkashCallback,
-);
+router.get("/bkash/callback", PaymentController.bkashCallback);
 
 // ======================================================
 // BKASH EXECUTE
@@ -51,9 +43,7 @@ router.get(
 router.post(
 	"/bkash/execute",
 	auth(Role.REQUESTER),
-	validateRequest(
-		paymentValidation.bkashExecuteSchema,
-	),
+	validateRequest(paymentValidation.bkashExecuteSchema),
 	PaymentController.executeBkashPayment,
 );
 
@@ -61,63 +51,41 @@ router.post(
 // STRIPE SUCCESS
 // ======================================================
 
-router.get(
-	"/payment-success",
-	(req, res) => {
-		const clientUrl =
-			process.env.FRONTEND_URL ||
-			"http://localhost:3000";
+router.get("/payment-success", (req, res) => {
+	const clientUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-		const paymentId =
-			req.query.paymentId as
-				| string
-				| undefined;
+	const paymentId = req.query.paymentId as string | undefined;
 
-		const params =
-			new URLSearchParams({
-				payment: "success",
+	const params = new URLSearchParams({
+		payment: "success",
 
-				...(paymentId
-					? { paymentId }
-					: {}),
-			});
+		...(paymentId ? { paymentId } : {}),
+	});
 
-		res.redirect(
-			`${clientUrl}/dashboard/requester/payments?${params.toString()}`,
-		);
-	},
-);
+	res.redirect(
+		`${clientUrl}/dashboard/requester/payments?${params.toString()}`,
+	);
+});
 
 // ======================================================
 // STRIPE CANCEL
 // ======================================================
 
-router.get(
-	"/payment-cancel",
-	(req, res) => {
-		const clientUrl =
-			process.env.FRONTEND_URL ||
-			"http://localhost:3000";
+router.get("/payment-cancel", (req, res) => {
+	const clientUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-		const paymentId =
-			req.query.paymentId as
-				| string
-				| undefined;
+	const paymentId = req.query.paymentId as string | undefined;
 
-		const params =
-			new URLSearchParams({
-				payment: "cancelled",
+	const params = new URLSearchParams({
+		payment: "cancelled",
 
-				...(paymentId
-					? { paymentId }
-					: {}),
-			});
+		...(paymentId ? { paymentId } : {}),
+	});
 
-		res.redirect(
-			`${clientUrl}/dashboard/requester/payments?${params.toString()}`,
-		);
-	},
-);
+	res.redirect(
+		`${clientUrl}/dashboard/requester/payments?${params.toString()}`,
+	);
+});
 
 // ======================================================
 // MY PAYMENTS

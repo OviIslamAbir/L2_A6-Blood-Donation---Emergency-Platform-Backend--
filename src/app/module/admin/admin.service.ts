@@ -1,7 +1,7 @@
 import {
 	DonorApplicationStatus,
 	NotificationType,
-		RequestStatus,
+	RequestStatus,
 	Role,
 } from "../../../generated/prisma/enums";
 
@@ -517,9 +517,7 @@ const deleteUser = async (payload: IDeleteUserPayload) => {
 // VERIFY BLOOD REQUEST
 // ======================================================
 
-const verifyBloodRequest = async (
-	payload: IVerifyBloodRequestPayload,
-) => {
+const verifyBloodRequest = async (payload: IVerifyBloodRequestPayload) => {
 	const bloodRequest = await prisma.bloodRequest.findUnique({
 		where: {
 			id: payload.requestId,
@@ -547,9 +545,7 @@ const verifyBloodRequest = async (
 	}
 
 	if (bloodRequest.status !== RequestStatus.PENDING) {
-		throw new Error(
-			"Only pending blood requests can be verified.",
-		);
+		throw new Error("Only pending blood requests can be verified.");
 	}
 
 	if (bloodRequest.requester.deletedAt) {

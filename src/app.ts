@@ -79,10 +79,7 @@ app.use("/api/v1/notifications", NotificationRoutes);
 app.use("/api/v1/donations", DonationRoutes);
 
 app.use("/api/v1/payments", PaymentRoutes);
-app.use(
-	"/api/v1/audit-logs",
-	AuditLogRoutes,
-);	
+app.use("/api/v1/audit-logs", AuditLogRoutes);
 
 // ======================================================
 // BASIC ROUTE
@@ -104,4 +101,3 @@ app.use(globalErrorHandler);
 app.use(notFound);
 
 export default app;
-

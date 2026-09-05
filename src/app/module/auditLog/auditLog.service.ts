@@ -1,7 +1,5 @@
 import httpStatus from "http-status";
 
-
-
 import type {
 	ICreateAuditLogPayload,
 	IGetAuditLogsQuery,
@@ -13,9 +11,7 @@ import { AppError } from "../../utils/apiError";
 // CREATE AUDIT LOG
 // ======================================================
 
-const createAuditLog = async (
-	payload: ICreateAuditLogPayload,
-) => {
+const createAuditLog = async (payload: ICreateAuditLogPayload) => {
 	return await prisma.auditLog.create({
 		data: {
 			userId: payload.userId,
@@ -27,17 +23,12 @@ const createAuditLog = async (
 			entityId: payload.entityId,
 
 			oldValue:
-				payload.oldValue !== undefined
-					? (payload.oldValue as any)
-					: undefined,
+				payload.oldValue !== undefined ? (payload.oldValue as any) : undefined,
 
 			newValue:
-				payload.newValue !== undefined
-					? (payload.newValue as any)
-					: undefined,
+				payload.newValue !== undefined ? (payload.newValue as any) : undefined,
 
-			ipAddress:
-				payload.ipAddress,
+			ipAddress: payload.ipAddress,
 		},
 	});
 };
@@ -47,15 +38,12 @@ const createAuditLog = async (
 // ADMIN ONLY
 // ======================================================
 
-const getAuditLogs = async (
-	query: IGetAuditLogsQuery,
-) => {
+const getAuditLogs = async (query: IGetAuditLogsQuery) => {
 	const page = query.page || 1;
 
 	const limit = query.limit || 20;
 
-	const skip =
-		(page - 1) * limit;
+	const skip = (page - 1) * limit;
 
 	const where: {
 		entity?: string;
@@ -75,10 +63,7 @@ const getAuditLogs = async (
 		where.userId = query.userId;
 	}
 
-	const [
-		logs,
-		total,
-	] = await Promise.all([
+	const [logs, total] = await Promise.all([
 		prisma.auditLog.findMany({
 			where,
 
@@ -107,8 +92,7 @@ const getAuditLogs = async (
 		}),
 	]);
 
-	const totalPages =
-		Math.ceil(total / limit);
+	const totalPages = Math.ceil(total / limit);
 
 	return {
 		meta: {
@@ -126,32 +110,26 @@ const getAuditLogs = async (
 // GET SINGLE AUDIT LOG
 // ======================================================
 
-const getSingleAuditLog = async (
-	auditLogId: string,
-) => {
-	const auditLog =
-		await prisma.auditLog.findUnique({
-			where: {
-				id: auditLogId,
-			},
+const getSingleAuditLog = async (auditLogId: string) => {
+	const auditLog = await prisma.auditLog.findUnique({
+		where: {
+			id: auditLogId,
+		},
 
-			include: {
-				user: {
-					select: {
-						id: true,
-						name: true,
-						email: true,
-						role: true,
-					},
+		include: {
+			user: {
+				select: {
+					id: true,
+					name: true,
+					email: true,
+					role: true,
 				},
 			},
-		});
+		},
+	});
 
 	if (!auditLog) {
-		throw new AppError(
-			httpStatus.NOT_FOUND,
-			"Audit log not found.",
-		);
+		throw new AppError(httpStatus.NOT_FOUND, "Audit log not found.");
 	}
 
 	return auditLog;
