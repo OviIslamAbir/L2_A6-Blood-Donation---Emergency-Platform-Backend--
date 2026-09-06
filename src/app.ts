@@ -88,7 +88,7 @@ app.use("/api/v1/audit-logs", AuditLogRoutes);
 app.get("/", async (req: Request, res: Response) => {
 	res.status(httpStatus.OK).json({
 		success: true,
-		message: "Welcome to PH Healthcare System Backend",
+		message: "Blood Donation & Emergency Assistance Platform",
 	});
 });
 
