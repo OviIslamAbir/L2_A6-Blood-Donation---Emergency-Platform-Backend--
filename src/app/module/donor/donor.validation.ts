@@ -1,9 +1,5 @@
 import z from "zod";
 
-// ======================================================
-// UPDATE DONOR PROFILE
-// ======================================================
-
 const updateDonorProfileSchema = z
 	.object({
 		bloodGroup: z
@@ -59,10 +55,6 @@ const updateDonorProfileSchema = z
 			path: ["dateOfBirth"],
 		},
 	);
-
-// ======================================================
-// EXPORT
-// ======================================================
 
 export const donorValidation = {
 	updateDonorProfileSchema,

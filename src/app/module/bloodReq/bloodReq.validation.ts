@@ -2,20 +2,12 @@ import z from "zod";
 
 import { BloodGroup, Urgency } from "../../../generated/prisma/enums";
 
-// ======================================================
-// ENUM HELPERS
-// ======================================================
-
 const bloodGroupValues = Object.values(BloodGroup) as [
 	BloodGroup,
 	...BloodGroup[],
 ];
 
 const urgencyValues = Object.values(Urgency) as [Urgency, ...Urgency[]];
-
-// ======================================================
-// CREATE BLOOD REQUEST
-// ======================================================
 
 const createBloodRequestSchema = z.object({
 	patientName: z
@@ -80,10 +72,6 @@ const createBloodRequestSchema = z.object({
 		.max(1000, "Reason cannot exceed 1000 characters.")
 		.optional(),
 });
-
-// ======================================================
-// UPDATE BLOOD REQUEST
-// ======================================================
 
 const updateBloodRequestSchema = z.object({
 	patientName: z
@@ -152,10 +140,6 @@ const updateBloodRequestSchema = z.object({
 		.max(1000, "Reason cannot exceed 1000 characters.")
 		.optional(),
 });
-
-// ======================================================
-// EXPORT
-// ======================================================
 
 export const bloodRequestValidation = {
 	createBloodRequestSchema,

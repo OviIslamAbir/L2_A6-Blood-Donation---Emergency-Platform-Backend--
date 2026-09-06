@@ -62,8 +62,4 @@ router.delete(
 	BloodRequestController.cancelBloodRequest,
 );
 
-// ======================================================
-// EXPORT
-// ======================================================
-
 export const BloodRequestRoutes = router;

@@ -68,10 +68,6 @@ const updateDonorProfile = catchAsync(async (req: Request, res: Response) => {
 	});
 });
 
-// ======================================================
-// EXPORT
-// ======================================================
-
 export const DonorController = {
 	getDonorProfile,
 	getDonorApplicationStatus,

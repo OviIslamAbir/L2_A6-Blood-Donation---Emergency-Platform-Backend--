@@ -6,10 +6,10 @@ import type {
 	IBkashExecutePayload,
 } from "./payment.interface";
 
-import config from "../config";
-import { prisma } from "../lib/prisma";
-import { getBkashIdToken } from "../lib/bkash";
-import { AppError } from "../utils/apiError";
+import config from "../../config";
+import { prisma } from "../../lib/prisma";
+import { getBkashIdToken } from "../../lib/bkash";
+import { AppError } from "../../utils/apiError";
 
 import {
 	NotificationType,
@@ -17,10 +17,21 @@ import {
 	PaymentStatus,
 	Role,
 	RequestStatus,
-} from "../../generated/prisma/enums";
-import { AuditLogServices } from "./auditLog/auditLog.service";
+} from "../../../generated/prisma/enums";
+
+import { AuditLogServices } from "../auditLog/auditLog.service";
 
 const stripe = new Stripe(config.stripe_secret_key);
+
+const getErrorMessage = (result: any, fallback: string) => {
+	return (
+		result?.statusMessage ||
+		result?.message ||
+		result?.errorMessage ||
+		result?.error ||
+		fallback
+	);
+};
 
 // ======================================================
 // CREATE PAYMENT
@@ -32,20 +43,12 @@ const createPayment = async (
 ) => {
 	const { requestId, amount, provider } = payload;
 
-	// ================================================
-	// VALIDATE AMOUNT
-	// ================================================
-
 	if (!Number.isFinite(amount) || amount <= 0) {
 		throw new AppError(
 			httpStatus.BAD_REQUEST,
 			"Payment amount must be greater than 0.",
 		);
 	}
-
-	// ================================================
-	// USER
-	// ================================================
 
 	const user = await prisma.user.findUnique({
 		where: {
@@ -76,10 +79,6 @@ const createPayment = async (
 		);
 	}
 
-	// ================================================
-	// BLOOD REQUEST
-	// ================================================
-
 	const bloodRequest = await prisma.bloodRequest.findUnique({
 		where: {
 			id: requestId,
@@ -104,10 +103,6 @@ const createPayment = async (
 		);
 	}
 
-	// ================================================
-	// REQUEST STATUS
-	// ================================================
-
 	if (
 		bloodRequest.status === RequestStatus.CANCELLED ||
 		bloodRequest.status === RequestStatus.REJECTED
@@ -117,18 +112,6 @@ const createPayment = async (
 			"This blood request cannot receive payment.",
 		);
 	}
-
-	/*
-	 * COMPLETED is intentionally allowed.
-	 *
-	 * Project flow:
-	 *
-	 * Donation → Payment → Audit Log
-	 */
-
-	// ================================================
-	// EXISTING PAYMENT
-	// ================================================
 
 	const existingPayment = await prisma.payment.findFirst({
 		where: {
@@ -147,10 +130,6 @@ const createPayment = async (
 		);
 	}
 
-	// ================================================
-	// CREATE DATABASE PAYMENT
-	// ================================================
-
 	const payment = await prisma.payment.create({
 		data: {
 			userId,
@@ -162,17 +141,10 @@ const createPayment = async (
 		},
 	});
 
-	// ================================================
-	// AUDIT LOG - PAYMENT CREATED
-	// ================================================
-
 	await AuditLogServices.createAuditLog({
 		userId,
-
 		action: "PAYMENT_CREATED",
-
 		entity: "Payment",
-
 		entityId: payment.id,
 
 		oldValue: null,
@@ -199,6 +171,14 @@ const createPayment = async (
 				throw new AppError(httpStatus.BAD_REQUEST, "Invalid payment amount.");
 			}
 
+			const successUrl =
+				`${config.bak_url}/api/v1/payments/payment-success` +
+				`?paymentId=${encodeURIComponent(payment.id)}`;
+
+			const cancelUrl =
+				`${config.bak_url}/api/v1/payments/payment-cancel` +
+				`?paymentId=${encodeURIComponent(payment.id)}`;
+
 			const session = await stripe.checkout.sessions.create({
 				mode: "payment",
 
@@ -210,12 +190,10 @@ const createPayment = async (
 
 						price_data: {
 							currency: "bdt",
-
 							unit_amount: amountInPaisa,
 
 							product_data: {
 								name: "Blood Donation Assistance Payment",
-
 								description: `Payment for blood request ${requestId}`,
 							},
 						},
@@ -224,34 +202,26 @@ const createPayment = async (
 
 				metadata: {
 					paymentId: payment.id,
-
 					requestId,
-
 					userId,
 				},
 
 				payment_intent_data: {
 					metadata: {
 						paymentId: payment.id,
-
 						requestId,
-
 						userId,
 					},
 				},
 
-				success_url: `${config.bak_url}/api/v1/payments/payment-success?paymentId=${payment.id}`,
-
-				cancel_url: `${config.bak_url}/api/v1/payments/payment-cancel?paymentId=${payment.id}`,
+				success_url: successUrl,
+				cancel_url: cancelUrl,
 			});
 
 			return {
 				paymentId: payment.id,
-
 				provider: PaymentProvider.STRIPE,
-
 				checkoutUrl: session.url,
-
 				sessionId: session.id,
 			};
 		} catch (error: any) {
@@ -280,9 +250,37 @@ const createPayment = async (
 
 	if (provider === PaymentProvider.BKASH) {
 		try {
+			const payerReference = user.phone || user.email;
+
+			if (!payerReference) {
+				throw new AppError(
+					httpStatus.BAD_REQUEST,
+					"Phone number or email is required for bKash payment.",
+				);
+			}
+
 			const token = await getBkashIdToken();
 
-			const callbackUrl = `${config.bkash_callback_url}?paymentId=${encodeURIComponent(payment.id)}`;
+			if (!token) {
+				throw new AppError(
+					httpStatus.BAD_GATEWAY,
+					"Failed to get bKash ID token.",
+				);
+			}
+
+			const callbackUrl =
+				`${config.bkash_callback_url}` +
+				`?paymentId=${encodeURIComponent(payment.id)}`;
+
+			const bkashPayload = {
+				mode: "0011",
+				payerReference,
+				callbackURL: callbackUrl,
+				amount: amount.toFixed(2),
+				currency: "BDT",
+				intent: "sale",
+				merchantInvoiceNumber: `BLOOD-${payment.id}`,
+			};
 
 			const response = await fetch(
 				`${config.bkash_base_url}/tokenized/checkout/create`,
@@ -291,35 +289,39 @@ const createPayment = async (
 
 					headers: {
 						"Content-Type": "application/json",
-
 						Accept: "application/json",
-
 						Authorization: token,
-
 						"X-App-Key": config.bkash_app_key,
 					},
 
-					body: JSON.stringify({
-						mode: "001",
-
-						payerReference: user.phone || user.email,
-
-						callbackURL: callbackUrl,
-
-						amount: amount.toFixed(2),
-
-						currency: "BDT",
-
-						intent: "sale",
-
-						merchantInvoiceNumber: `BLOOD-${payment.id}`,
-					}),
+					body: JSON.stringify(bkashPayload),
 				},
 			);
 
-			const result = await response.json();
+			const rawResponse = await response.text();
 
-			if (!response.ok || !result.paymentID) {
+			let result: any;
+
+			try {
+				result = JSON.parse(rawResponse);
+			} catch {
+				result = {
+					rawResponse,
+				};
+			}
+
+			const isCreateSuccess =
+				response.ok &&
+				result?.statusCode === "0000" &&
+				!!result?.paymentID &&
+				!!result?.bkashURL;
+
+			if (!isCreateSuccess) {
+				const errorMessage = getErrorMessage(
+					result,
+					"Failed to create bKash payment.",
+				);
+
 				await prisma.payment.update({
 					where: {
 						id: payment.id,
@@ -329,10 +331,6 @@ const createPayment = async (
 						status: PaymentStatus.FAILED,
 					},
 				});
-
-				// ==========================================
-				// AUDIT LOG - BKASH CREATE FAILED
-				// ==========================================
 
 				await AuditLogServices.createAuditLog({
 					userId,
@@ -349,22 +347,14 @@ const createPayment = async (
 
 					newValue: {
 						status: PaymentStatus.FAILED,
-
 						provider: PaymentProvider.BKASH,
-
-						error: result.statusMessage || "Failed to create bKash payment.",
+						error: errorMessage,
+						bkashResponse: result,
 					},
 				});
 
-				throw new AppError(
-					httpStatus.BAD_GATEWAY,
-					result.statusMessage || "Failed to create bKash payment.",
-				);
+				throw new AppError(httpStatus.BAD_GATEWAY, errorMessage);
 			}
-
-			// ==========================================
-			// SAVE BKASH PAYMENT ID
-			// ==========================================
 
 			await prisma.payment.update({
 				where: {
@@ -375,10 +365,6 @@ const createPayment = async (
 					transactionId: result.paymentID,
 				},
 			});
-
-			// ==========================================
-			// AUDIT LOG - BKASH CREATED
-			// ==========================================
 
 			await AuditLogServices.createAuditLog({
 				userId,
@@ -391,20 +377,16 @@ const createPayment = async (
 
 				oldValue: {
 					status: PaymentStatus.PENDING,
-
 					transactionId: null,
 				},
 
 				newValue: {
 					status: PaymentStatus.PENDING,
-
 					transactionId: result.paymentID,
-
 					provider: PaymentProvider.BKASH,
-
 					amount: amount.toString(),
-
 					currency: "BDT",
+					transactionStatus: result.transactionStatus,
 				},
 			});
 
@@ -416,6 +398,12 @@ const createPayment = async (
 				bkashPaymentId: result.paymentID,
 
 				bkashUrl: result.bkashURL,
+
+				statusCode: result.statusCode,
+
+				statusMessage: result.statusMessage,
+
+				transactionStatus: result.transactionStatus,
 			};
 		} catch (error: any) {
 			if (error instanceof AppError) {
@@ -448,9 +436,7 @@ const createPayment = async (
 
 					newValue: {
 						status: PaymentStatus.FAILED,
-
 						provider: PaymentProvider.BKASH,
-
 						error: error?.message || "Failed to create bKash payment.",
 					},
 				});
@@ -462,10 +448,6 @@ const createPayment = async (
 			);
 		}
 	}
-
-	// ================================================
-	// UNSUPPORTED PROVIDER
-	// ================================================
 
 	await prisma.payment.update({
 		where: {
@@ -492,7 +474,6 @@ const createPayment = async (
 
 		newValue: {
 			status: PaymentStatus.FAILED,
-
 			provider,
 		},
 	});
@@ -526,17 +507,9 @@ const executeBkashPayment = async (
 		throw new AppError(httpStatus.BAD_REQUEST, "This is not a bKash payment.");
 	}
 
-	// ================================================
-	// ALREADY PAID
-	// ================================================
-
 	if (payment.status === PaymentStatus.PAID) {
 		return payment;
 	}
-
-	// ================================================
-	// MUST BE PENDING
-	// ================================================
 
 	if (payment.status !== PaymentStatus.PENDING) {
 		throw new AppError(
@@ -545,10 +518,6 @@ const executeBkashPayment = async (
 		);
 	}
 
-	// ================================================
-	// VERIFY BKASH PAYMENT ID
-	// ================================================
-
 	if (
 		!payment.transactionId ||
 		payment.transactionId !== payload.bkashPaymentId
@@ -556,15 +525,11 @@ const executeBkashPayment = async (
 		throw new AppError(httpStatus.BAD_REQUEST, "Invalid bKash payment ID.");
 	}
 
-	// ================================================
-	// TOKEN
-	// ================================================
-
 	const token = await getBkashIdToken();
 
-	// ================================================
-	// EXECUTE
-	// ================================================
+	if (!token) {
+		throw new AppError(httpStatus.BAD_GATEWAY, "Failed to get bKash ID token.");
+	}
 
 	const response = await fetch(
 		`${config.bkash_base_url}/tokenized/checkout/execute`,
@@ -573,11 +538,8 @@ const executeBkashPayment = async (
 
 			headers: {
 				"Content-Type": "application/json",
-
 				Accept: "application/json",
-
 				Authorization: token,
-
 				"X-App-Key": config.bkash_app_key,
 			},
 
@@ -587,11 +549,17 @@ const executeBkashPayment = async (
 		},
 	);
 
-	const result = await response.json();
+	const rawResponse = await response.text();
 
-	// ================================================
-	// API ERROR
-	// ================================================
+	let result: any;
+
+	try {
+		result = JSON.parse(rawResponse);
+	} catch {
+		result = {
+			rawResponse,
+		};
+	}
 
 	if (!response.ok) {
 		await prisma.payment.update({
@@ -619,23 +587,20 @@ const executeBkashPayment = async (
 
 			newValue: {
 				status: PaymentStatus.FAILED,
-
-				error: result.statusMessage || "bKash payment execution failed.",
+				provider: PaymentProvider.BKASH,
+				error: getErrorMessage(result, "bKash payment execution failed."),
+				bkashResponse: result,
 			},
 		});
 
 		throw new AppError(
 			httpStatus.BAD_GATEWAY,
-			result.statusMessage || "bKash payment execution failed.",
+			getErrorMessage(result, "bKash payment execution failed."),
 		);
 	}
 
-	// ================================================
-	// CHECK SUCCESS
-	// ================================================
-
 	const isCompleted =
-		result.transactionStatus === "Completed" || result.statusCode === "0000";
+		result?.transactionStatus === "Completed" || result?.statusCode === "0000";
 
 	if (!isCompleted) {
 		await prisma.payment.update({
@@ -663,24 +628,23 @@ const executeBkashPayment = async (
 
 			newValue: {
 				status: PaymentStatus.FAILED,
-
-				transactionStatus: result.transactionStatus,
-
-				statusCode: result.statusCode,
-
-				error: result.statusMessage || "bKash payment was not completed.",
+				provider: PaymentProvider.BKASH,
+				transactionStatus: result?.transactionStatus,
+				statusCode: result?.statusCode,
+				error: getErrorMessage(result, "bKash payment was not completed."),
+				bkashResponse: result,
 			},
 		});
 
 		throw new AppError(
 			httpStatus.BAD_REQUEST,
-			result.statusMessage || "bKash payment was not completed.",
+			getErrorMessage(result, "bKash payment was not completed."),
 		);
 	}
 
-	// ================================================
+	// ==================================================
 	// PAYMENT SUCCESS
-	// ================================================
+	// ==================================================
 
 	const updatedPayment = await prisma.$transaction(async (tx) => {
 		const currentPayment = await tx.payment.findUnique({
@@ -693,7 +657,6 @@ const executeBkashPayment = async (
 			throw new AppError(httpStatus.NOT_FOUND, "Payment not found.");
 		}
 
-		// Duplicate protection
 		if (currentPayment.status === PaymentStatus.PAID) {
 			return currentPayment;
 		}
@@ -706,7 +669,7 @@ const executeBkashPayment = async (
 			data: {
 				status: PaymentStatus.PAID,
 
-				transactionId: result.trxID || currentPayment.transactionId,
+				transactionId: result?.trxID || currentPayment.transactionId,
 
 				paidAt: new Date(),
 			},
@@ -727,10 +690,6 @@ const executeBkashPayment = async (
 		return updated;
 	});
 
-	// ================================================
-	// AUDIT LOG - BKASH PAID
-	// ================================================
-
 	await AuditLogServices.createAuditLog({
 		userId,
 
@@ -742,18 +701,21 @@ const executeBkashPayment = async (
 
 		oldValue: {
 			status: PaymentStatus.PENDING,
-
 			transactionId: payment.transactionId,
 		},
 
 		newValue: {
 			status: PaymentStatus.PAID,
 
-			transactionId: result.trxID || payment.transactionId,
+			transactionId: result?.trxID || payment.transactionId,
 
 			provider: PaymentProvider.BKASH,
 
 			paidAt: updatedPayment.paidAt,
+
+			transactionStatus: result?.transactionStatus,
+
+			statusCode: result?.statusCode,
 		},
 	});
 
@@ -785,10 +747,6 @@ const bkashCallback = async (
 
 	const normalizedStatus = status?.toLowerCase();
 
-	// ================================================
-	// BKASH CANCEL / FAILURE
-	// ================================================
-
 	if (
 		normalizedStatus === "cancel" ||
 		normalizedStatus === "cancelled" ||
@@ -805,10 +763,6 @@ const bkashCallback = async (
 					status: PaymentStatus.CANCELLED,
 				},
 			});
-
-			// ==========================================
-			// AUDIT LOG - BKASH CANCELLED
-			// ==========================================
 
 			await AuditLogServices.createAuditLog({
 				userId: payment.userId,
@@ -851,16 +805,8 @@ const bkashCallback = async (
 	};
 };
 
-// ======================================================
-// STRIPE WEBHOOK
-// ======================================================
-
 const stripeWebhook = async (body: Buffer, signature: string) => {
 	let event: Stripe.Event;
-
-	// ================================================
-	// VERIFY SIGNATURE
-	// ================================================
 
 	try {
 		event = stripe.webhooks.constructEvent(
@@ -875,15 +821,7 @@ const stripeWebhook = async (body: Buffer, signature: string) => {
 		);
 	}
 
-	// ================================================
-	// EVENT HANDLING
-	// ================================================
-
 	switch (event.type) {
-		// ================================================
-		// CHECKOUT COMPLETED
-		// ================================================
-
 		case "checkout.session.completed": {
 			const session = event.data.object as Stripe.Checkout.Session;
 
@@ -954,10 +892,6 @@ const stripeWebhook = async (body: Buffer, signature: string) => {
 				});
 			});
 
-			// ==========================================
-			// AUDIT LOG - STRIPE PAID
-			// ==========================================
-
 			if (paidPaymentUserId) {
 				await AuditLogServices.createAuditLog({
 					userId: paidPaymentUserId,
@@ -986,10 +920,6 @@ const stripeWebhook = async (body: Buffer, signature: string) => {
 
 			break;
 		}
-
-		// ================================================
-		// PAYMENT INTENT FAILED
-		// ================================================
 
 		case "payment_intent.payment_failed": {
 			const paymentIntent = event.data.object as Stripe.PaymentIntent;
@@ -1046,10 +976,6 @@ const stripeWebhook = async (body: Buffer, signature: string) => {
 				});
 			});
 
-			// ==========================================
-			// AUDIT LOG - STRIPE FAILED
-			// ==========================================
-
 			if (failedUserId) {
 				await AuditLogServices.createAuditLog({
 					userId: failedUserId,
@@ -1080,10 +1006,6 @@ const stripeWebhook = async (body: Buffer, signature: string) => {
 
 			break;
 		}
-
-		// ================================================
-		// CHECKOUT EXPIRED
-		// ================================================
 
 		case "checkout.session.expired": {
 			const session = event.data.object as Stripe.Checkout.Session;
@@ -1117,10 +1039,6 @@ const stripeWebhook = async (body: Buffer, signature: string) => {
 					status: PaymentStatus.FAILED,
 				},
 			});
-
-			// ==========================================
-			// AUDIT LOG - STRIPE EXPIRED
-			// ==========================================
 
 			await AuditLogServices.createAuditLog({
 				userId: payment.userId,
@@ -1225,10 +1143,6 @@ const getSinglePayment = async (paymentId: string, userId: string) => {
 
 	return payment;
 };
-
-// ======================================================
-// EXPORT
-// ======================================================
 
 export const PaymentServices = {
 	createPayment,

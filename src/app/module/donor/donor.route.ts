@@ -35,8 +35,4 @@ router.patch(
 	DonorController.updateDonorProfile,
 );
 
-// ======================================================
-// EXPORT
-// ======================================================
-
 export const DonorRoutes = router;

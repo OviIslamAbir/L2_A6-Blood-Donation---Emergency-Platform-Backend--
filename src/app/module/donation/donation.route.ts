@@ -7,7 +7,6 @@ import { donationValidation } from "./donation.validation";
 
 const router = Router();
 
-// DONOR
 router.post(
 	"/",
 	auth(Role.DONOR),

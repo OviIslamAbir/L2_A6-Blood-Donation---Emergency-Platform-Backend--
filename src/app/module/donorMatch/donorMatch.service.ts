@@ -94,17 +94,13 @@ const calculateMatchScore = (
 ): number => {
 	let score = 50;
 
-	// Same district
 	if (
 		requestDistrict &&
 		donorDistrict &&
 		requestDistrict.toLowerCase() === donorDistrict.toLowerCase()
 	) {
 		score += 25;
-	}
-
-	// Same division
-	else if (
+	} else if (
 		requestDivision &&
 		donorDivision &&
 		requestDivision.toLowerCase() === donorDivision.toLowerCase()
@@ -112,7 +108,6 @@ const calculateMatchScore = (
 		score += 15;
 	}
 
-	// Distance score
 	if (distanceKm !== null) {
 		if (distanceKm <= 5) {
 			score += 25;
@@ -168,10 +163,6 @@ const matchDonors = async (requestId: string, requesterId: string) => {
 		throw new Error("Only requesters can find donors for a blood request.");
 	}
 
-	// ----------------------------------------------------
-	// GET BLOOD REQUEST
-	// ----------------------------------------------------
-
 	const bloodRequest = await prisma.bloodRequest.findUnique({
 		where: {
 			id: requestId,
@@ -199,10 +190,6 @@ const matchDonors = async (requestId: string, requesterId: string) => {
 	) {
 		throw new Error("Donors cannot be matched for this request.");
 	}
-
-	// ----------------------------------------------------
-	// FIND COMPATIBLE DONORS
-	// ----------------------------------------------------
 
 	const compatibleGroups = compatibleDonorGroups[bloodRequest.bloodGroup];
 
@@ -238,14 +225,9 @@ const matchDonors = async (requestId: string, requesterId: string) => {
 		throw new Error("No compatible available donors found.");
 	}
 
-	// ----------------------------------------------------
-	// CREATE MATCHES
-	// ----------------------------------------------------
-
 	const matches = [];
 
 	for (const donor of donors) {
-		// Prevent duplicate matching
 		const existingMatch = await prisma.donorMatch.findUnique({
 			where: {
 				requestId_donorId: {
@@ -311,10 +293,6 @@ const matchDonors = async (requestId: string, requesterId: string) => {
 			},
 		});
 
-		// --------------------------------------------------
-		// CREATE NOTIFICATION
-		// --------------------------------------------------
-
 		await prisma.notification.create({
 			data: {
 				userId: donor.userId,
@@ -334,10 +312,6 @@ const matchDonors = async (requestId: string, requesterId: string) => {
 
 		matches.push(match);
 	}
-
-	// ----------------------------------------------------
-	// UPDATE REQUEST STATUS
-	// ----------------------------------------------------
 
 	if (matches.length > 0) {
 		await prisma.bloodRequest.update({
@@ -618,7 +592,6 @@ const acceptMatch = async (matchId: string, donorUserId: string) => {
 		},
 	});
 
-	// Notify requester
 	await prisma.notification.create({
 		data: {
 			userId: match.request.requesterId,
@@ -629,7 +602,6 @@ const acceptMatch = async (matchId: string, donorUserId: string) => {
 		},
 	});
 
-	// Update request status
 	await prisma.bloodRequest.update({
 		where: {
 			id: match.requestId,

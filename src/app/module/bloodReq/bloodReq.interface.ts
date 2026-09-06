@@ -1,9 +1,5 @@
 import type { BloodGroup, Urgency } from "../../../generated/prisma/enums";
 
-// ======================================================
-// CREATE BLOOD REQUEST
-// ======================================================
-
 export interface ICreateBloodRequestPayload {
 	patientName: string;
 
@@ -26,10 +22,6 @@ export interface ICreateBloodRequestPayload {
 
 	reason?: string;
 }
-
-// ======================================================
-// UPDATE BLOOD REQUEST
-// ======================================================
 
 export interface IUpdateBloodRequestPayload {
 	patientName?: string;

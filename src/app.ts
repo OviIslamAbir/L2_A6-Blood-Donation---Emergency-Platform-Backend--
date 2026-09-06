@@ -18,7 +18,7 @@ import { BloodRequestRoutes } from "./app/module/bloodReq/bloodReq.route";
 import { DonorMatchRoutes } from "./app/module/donorMatch/donorMatch.route";
 import { NotificationRoutes } from "./app/module/notification/notification.route";
 import { DonationRoutes } from "./app/module/donation/donation.route";
-import { PaymentRoutes } from "./app/module/payment.route";
+import { PaymentRoutes } from "./app/module/payment/payment.route";
 import { AuditLogRoutes } from "./app/module/auditLog/auditLog.route";
 
 const app: Application = express();
@@ -29,7 +29,7 @@ const app: Application = express();
 
 app.use(
 	cors({
-		origin: config.frontend_url,
+		origin: config.bak_url,
 		credentials: true,
 	}),
 );
@@ -68,7 +68,7 @@ app.use("/api/v1/auth", AuthRoutes);
 
 app.use("/api/v1/admin", AdminRoutes);
 
-app.use("/api/v1/donor", DonorRoutes);
+app.use("/api/v1/donors", DonorRoutes);
 
 app.use("/api/v1/blood-requests", BloodRequestRoutes);
 

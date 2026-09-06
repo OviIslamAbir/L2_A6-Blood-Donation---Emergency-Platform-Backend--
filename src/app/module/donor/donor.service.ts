@@ -4,10 +4,6 @@ import { prisma } from "../../lib/prisma";
 
 import type { IDonorProfileUpdatePayload } from "./donor.interface";
 
-// ======================================================
-// BLOOD GROUP MAP
-// ======================================================
-
 const bloodGroupMap: Record<string, BloodGroup> = {
 	"A+": BloodGroup.A_POSITIVE,
 	"A-": BloodGroup.A_NEGATIVE,
@@ -140,10 +136,6 @@ const updateDonorProfile = async (
 		throw new Error("Donor profile not found.");
 	}
 
-	// ==================================================
-	// BLOOD GROUP
-	// ==================================================
-
 	let bloodGroup: BloodGroup | undefined;
 
 	if (payload.bloodGroup !== undefined) {
@@ -153,10 +145,6 @@ const updateDonorProfile = async (
 			throw new Error("Invalid blood group.");
 		}
 	}
-
-	// ==================================================
-	// DATE OF BIRTH
-	// ==================================================
 
 	let dateOfBirth: Date | undefined;
 
@@ -169,10 +157,6 @@ const updateDonorProfile = async (
 
 		dateOfBirth = parsedDate;
 	}
-
-	// ==================================================
-	// UPDATE DONOR PROFILE
-	// ==================================================
 
 	const donorProfile = await prisma.donorProfile.update({
 		where: {
@@ -215,10 +199,6 @@ const updateDonorProfile = async (
 		donorProfile,
 	};
 };
-
-// ======================================================
-// EXPORT
-// ======================================================
 
 export const DonorService = {
 	getDonorProfile,

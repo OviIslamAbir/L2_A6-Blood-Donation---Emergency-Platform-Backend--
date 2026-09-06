@@ -1,9 +1,5 @@
 import z from "zod";
 
-// ======================================================
-// BLOOD GROUP
-// ======================================================
-
 const bloodGroupSchema = z.enum([
 	"A+",
 	"A-",
@@ -15,18 +11,9 @@ const bloodGroupSchema = z.enum([
 	"O-",
 ]);
 
-// ======================================================
-// REQUESTER TYPE
-// ======================================================
-
 const requesterTypeSchema = z.enum(["PATIENT", "HOSPITAL"], {
 	message: "Requester type must be either PATIENT or HOSPITAL",
 });
-
-// ======================================================
-// REGISTER USER
-// Always creates REQUESTER
-// ======================================================
 
 const registerUserSchema = z.object({
 	name: z
@@ -64,16 +51,8 @@ const registerUserSchema = z.object({
 			message: "Password must contain at least one special character",
 		}),
 
-	// ==================================================
-	// PATIENT / HOSPITAL
-	// ==================================================
-
 	requesterType: requesterTypeSchema,
 });
-
-// ======================================================
-// VERIFY EMAIL
-// ======================================================
 
 const verifyEmailSchema = z.object({
 	email: z.email({
@@ -90,10 +69,6 @@ const verifyEmailSchema = z.object({
 		}),
 });
 
-// ======================================================
-// LOGIN
-// ======================================================
-
 const loginUserSchema = z.object({
 	email: z.email({
 		message: "Please provide a valid email address",
@@ -109,29 +84,17 @@ const loginUserSchema = z.object({
 		}),
 });
 
-// ======================================================
-// GOOGLE LOGIN
-// ======================================================
-
 const googleLoginSchema = z.object({
 	idToken: z.string().trim().min(1, {
 		message: "Google ID token is required",
 	}),
 });
 
-// ======================================================
-// FORGOT PASSWORD
-// ======================================================
-
 const forgotPasswordSchema = z.object({
 	email: z.email({
 		message: "Please provide a valid email address",
 	}),
 });
-
-// ======================================================
-// RESET PASSWORD
-// ======================================================
 
 const resetPasswordSchema = z.object({
 	email: z.email({
@@ -168,10 +131,6 @@ const resetPasswordSchema = z.object({
 			message: "Password must contain at least 1 special character",
 		}),
 });
-
-// ======================================================
-// DONOR APPLICATION
-// ======================================================
 
 const donorApplicationSchema = z.object({
 	bloodGroup: bloodGroupSchema,
@@ -228,10 +187,6 @@ const donorApplicationSchema = z.object({
 		})
 		.optional(),
 });
-
-// ======================================================
-// EXPORT
-// ======================================================
 
 export const userValidation = {
 	registerUserSchema,

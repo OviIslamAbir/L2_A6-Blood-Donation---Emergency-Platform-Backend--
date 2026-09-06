@@ -818,10 +818,6 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 		},
 	});
 
-	// ==================================================
-	// NOTIFY ADMINS
-	// ==================================================
-
 	const admins = await prisma.user.findMany({
 		where: {
 			role: Role.ADMIN,
@@ -848,10 +844,6 @@ const applyForDonor = async (payload: IDonorApplicationPayload) => {
 		message: "Donor application submitted. Waiting for admin approval.",
 	};
 };
-
-// ======================================================
-// EXPORT
-// ======================================================
 
 export const AuthService = {
 	registerUser,

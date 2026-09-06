@@ -115,10 +115,6 @@ const createBloodRequest = async (
 		},
 	});
 
-	// ==================================================
-	// NOTIFY ADMINS
-	// ==================================================
-
 	const admins = await prisma.user.findMany({
 		where: {
 			role: Role.ADMIN,

@@ -84,8 +84,4 @@ router.patch(
 
 router.delete("/users/:userId", auth("ADMIN"), AdminController.deleteUser);
 
-// ======================================================
-// EXPORT
-// ======================================================
-
 export const AdminRoutes = router;

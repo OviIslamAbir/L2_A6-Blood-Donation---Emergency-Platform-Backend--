@@ -3,8 +3,8 @@ import type { Request, Response } from "express";
 import httpStatus from "http-status";
 
 import { PaymentServices } from "./payment.service";
-import { catchAsync } from "../utils/catchAsync";
-import { sendResponse } from "../utils/sendResponse";
+import { catchAsync } from "../../utils/catchAsync";
+import { sendResponse } from "../../utils/sendResponse";
 
 // ======================================================
 // CREATE PAYMENT
@@ -52,7 +52,6 @@ const executeBkashPayment = catchAsync(async (req: Request, res: Response) => {
 // ======================================================
 // BKASH CALLBACK
 // ======================================================
-
 const bkashCallback = catchAsync(async (req: Request, res: Response) => {
 	const paymentId = req.query.paymentId as string;
 
@@ -62,10 +61,10 @@ const bkashCallback = catchAsync(async (req: Request, res: Response) => {
 	const status = req.query.status as string | undefined;
 
 	if (!paymentId) {
-		res.redirect(
-			`${process.env.FRONTEND_URL}/dashboard/requester/payments?payment=failed`,
-		);
-
+		res.status(400).json({
+			success: false,
+			message: "Payment ID is missing",
+		});
 		return;
 	}
 
@@ -75,20 +74,17 @@ const bkashCallback = catchAsync(async (req: Request, res: Response) => {
 		status,
 	);
 
-	const clientUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-
-	const params = new URLSearchParams({
-		payment: "bkash",
-		paymentId: result.paymentId,
-		bkashPaymentId: result.bkashPaymentId || "",
-		status: result.status || "",
+	res.status(200).json({
+		success: true,
+		message: "Payment callback processed",
+		data: {
+			payment: "bkash",
+			paymentId: result.paymentId,
+			bkashPaymentId: result.bkashPaymentId || "",
+			status: result.status || "",
+		},
 	});
-
-	res.redirect(
-		`${clientUrl}/dashboard/requester/payments?${params.toString()}`,
-	);
 });
-
 // ======================================================
 // STRIPE WEBHOOK
 // ======================================================

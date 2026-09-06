@@ -17,7 +17,6 @@ const createDonation = async (
 ) => {
 	const { requestId, notes } = payload;
 
-	// Check donor
 	const donor = await prisma.donorProfile.findUnique({
 		where: {
 			userId: donorUserId,
@@ -47,7 +46,6 @@ const createDonation = async (
 		throw new Error("Only donors can create donations.");
 	}
 
-	// Check accepted match
 	const match = await prisma.donorMatch.findFirst({
 		where: {
 			donorId: donor.id,
@@ -77,7 +75,6 @@ const createDonation = async (
 		throw new Error("This blood request has been rejected.");
 	}
 
-	// Prevent duplicate donation
 	const existingDonation = await prisma.donation.findUnique({
 		where: {
 			donorId_requestId: {
@@ -307,7 +304,6 @@ const completeDonation = async (
 			},
 		});
 
-		// Update donor statistics
 		await tx.donorProfile.update({
 			where: {
 				id: donor.id,
@@ -321,7 +317,6 @@ const completeDonation = async (
 			},
 		});
 
-		// Complete blood request
 		await tx.bloodRequest.update({
 			where: {
 				id: donation.requestId,
@@ -332,7 +327,6 @@ const completeDonation = async (
 			},
 		});
 
-		// Notify requester
 		await tx.notification.create({
 			data: {
 				userId: donation.request.requesterId,

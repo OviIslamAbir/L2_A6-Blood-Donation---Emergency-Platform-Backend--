@@ -23,10 +23,6 @@ declare global {
 
 export const auth = (...requiredRoles: Role[]) => {
 	return catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-		// ==================================================
-		// Get Access Token
-		// ==================================================
-
 		const token = req.cookies?.accessToken
 			? req.cookies.accessToken
 			: req.headers.authorization?.startsWith("Bearer ")
@@ -39,10 +35,6 @@ export const auth = (...requiredRoles: Role[]) => {
 			);
 		}
 
-		// ==================================================
-		// Verify Access Token
-		// ==================================================
-
 		const verifiedToken = jwtUtils.verifyToken(token, config.jwt_access_secret);
 
 		if (!verifiedToken.success || !verifiedToken.data) {
@@ -51,27 +43,15 @@ export const auth = (...requiredRoles: Role[]) => {
 
 		const { email, name, userId, role } = verifiedToken.data as JwtPayload;
 
-		// ==================================================
-		// Validate Token Payload
-		// ==================================================
-
 		if (!email || !name || !userId || !role) {
 			throw new Error("Invalid token payload");
 		}
-
-		// ==================================================
-		// Role Authorization
-		// ==================================================
 
 		if (requiredRoles.length > 0 && !requiredRoles.includes(role as Role)) {
 			throw new Error(
 				"Forbidden. You don't have permission to access this resource.",
 			);
 		}
-
-		// ==================================================
-		// Check User From Database
-		// ==================================================
 
 		const user = await prisma.user.findUnique({
 			where: {
@@ -83,10 +63,6 @@ export const auth = (...requiredRoles: Role[]) => {
 			throw new Error("User not found. Please log in again.");
 		}
 
-		// ==================================================
-		// Account Status
-		// ==================================================
-
 		if (user.deletedAt) {
 			throw new Error("Your account has been deleted.");
 		}
@@ -95,25 +71,13 @@ export const auth = (...requiredRoles: Role[]) => {
 			throw new Error("Your account is inactive. Please contact support.");
 		}
 
-		// ==================================================
-		// Email Verification
-		// ==================================================
-
 		if (!user.emailVerified) {
 			throw new Error("Please verify your email first.");
 		}
 
-		// ==================================================
-		// Check Database Role
-		// ==================================================
-
 		if (user.role !== role) {
 			throw new Error("User role has changed. Please log in again.");
 		}
-
-		// ==================================================
-		// Set Request User
-		// ==================================================
 
 		req.user = {
 			email: user.email,
@@ -121,10 +85,6 @@ export const auth = (...requiredRoles: Role[]) => {
 			userId: user.id,
 			role: user.role,
 		};
-
-		// ==================================================
-		// Continue
-		// ==================================================
 
 		next();
 	});

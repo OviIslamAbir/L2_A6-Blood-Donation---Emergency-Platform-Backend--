@@ -133,10 +133,6 @@ const cancelBloodRequest = catchAsync(async (req: Request, res: Response) => {
 	});
 });
 
-// ======================================================
-// EXPORT
-// ======================================================
-
 export const BloodRequestController = {
 	createBloodRequest,
 	getMyBloodRequests,

@@ -239,10 +239,6 @@ const applyForDonor = catchAsync(async (req: Request, res: Response) => {
 	});
 });
 
-// ======================================================
-// EXPORT
-// ======================================================
-
 export const AuthController = {
 	registerUser,
 	verifyEmail,

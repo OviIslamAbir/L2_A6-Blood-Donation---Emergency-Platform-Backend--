@@ -2,7 +2,7 @@ export class AppError extends Error {
 	public statusCode: number;
 
 	constructor(statusCode: number, message: string, stack = "") {
-		super(message); // throw new Error(message)
+		super(message);
 
 		this.statusCode = statusCode;
 
@@ -13,5 +13,3 @@ export class AppError extends Error {
 		}
 	}
 }
-
-//throw new AppError(404, "Not Found")

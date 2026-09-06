@@ -164,10 +164,6 @@ const approveDonorApplication = async (payload: IApproveDonorPayload) => {
 		return updated;
 	});
 
-	// ==================================================
-	// APPROVAL EMAIL
-	// ==================================================
-
 	try {
 		const templatePath = path.join(
 			process.cwd(),

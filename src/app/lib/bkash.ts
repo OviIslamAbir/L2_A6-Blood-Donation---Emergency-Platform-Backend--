@@ -21,10 +21,6 @@ export const getBkashIdToken = async (): Promise<string> => {
 
 		const refreshTokenTTL = await redisClient.ttl(REFRESH_TOKEN_KEY);
 
-		// ================================================
-		// REFRESH EXISTING TOKEN
-		// ================================================
-
 		if (
 			(!idToken || idTokenTTL <= TOKEN_REFRESH_BUFFER_SECONDS) &&
 			refreshToken &&
@@ -78,17 +74,9 @@ export const getBkashIdToken = async (): Promise<string> => {
 			return idToken as string;
 		}
 
-		// ================================================
-		// USE CACHED TOKEN
-		// ================================================
-
 		if (idToken && idTokenTTL > TOKEN_REFRESH_BUFFER_SECONDS) {
 			return idToken;
 		}
-
-		// ================================================
-		// GRANT NEW TOKEN
-		// ================================================
 
 		const response = await fetch(
 			`${config.bkash_base_url}/tokenized/checkout/token/grant`,
