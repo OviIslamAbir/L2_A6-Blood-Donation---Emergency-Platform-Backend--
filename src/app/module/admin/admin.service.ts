@@ -1,8 +1,8 @@
 import {
-	DonorApplicationStatus,
-	NotificationType,
-	RequestStatus,
-	Role,
+    DonorApplicationStatus,
+    NotificationType,
+    RequestStatus,
+    Role,
 } from "../../../generated/prisma/enums";
 
 import { prisma } from "../../lib/prisma";
@@ -13,12 +13,12 @@ import path from "path";
 import ejs from "ejs";
 
 import type {
-	IApproveDonorPayload,
-	IRejectDonorPayload,
-	IGetUsersQuery,
-	IUpdateUserStatusPayload,
-	IDeleteUserPayload,
-	IVerifyBloodRequestPayload,
+    IApproveDonorPayload,
+    IRejectDonorPayload,
+    IGetUsersQuery,
+    IUpdateUserStatusPayload,
+    IDeleteUserPayload,
+    IVerifyBloodRequestPayload,
 } from "./admin.interface";
 
 // ======================================================
@@ -26,30 +26,30 @@ import type {
 // ======================================================
 
 const getDonorApplications = async () => {
-	return prisma.user.findMany({
-		where: {
-			donorApplicationStatus: {
-				in: [
-					DonorApplicationStatus.PENDING,
-					DonorApplicationStatus.APPROVED,
-					DonorApplicationStatus.REJECTED,
-				],
-			},
-			deletedAt: null,
-		},
+    return prisma.user.findMany({
+        where: {
+            donorApplicationStatus: {
+                in: [
+                    DonorApplicationStatus.PENDING,
+                    DonorApplicationStatus.APPROVED,
+                    DonorApplicationStatus.REJECTED,
+                ],
+            },
+            deletedAt: null,
+        },
 
-		include: {
-			donorProfile: true,
-		},
+        include: {
+            donorProfile: true,
+        },
 
-		omit: {
-			password: true,
-		},
+        omit: {
+            password: true,
+        },
 
-		orderBy: {
-			createdAt: "desc",
-		},
-	});
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
 };
 
 // ======================================================
@@ -57,218 +57,224 @@ const getDonorApplications = async () => {
 // ======================================================
 
 const getPendingDonorApplications = async () => {
-	return prisma.user.findMany({
-		where: {
-			role: Role.REQUESTER,
-			donorApplicationStatus: DonorApplicationStatus.PENDING,
-			deletedAt: null,
-		},
+    return prisma.user.findMany({
+        where: {
+            role: Role.REQUESTER,
+            donorApplicationStatus: DonorApplicationStatus.PENDING,
+            deletedAt: null,
+        },
 
-		include: {
-			donorProfile: true,
-		},
+        include: {
+            donorProfile: true,
+        },
 
-		omit: {
-			password: true,
-		},
+        omit: {
+            password: true,
+        },
 
-		orderBy: {
-			createdAt: "asc",
-		},
-	});
+        orderBy: {
+            createdAt: "asc",
+        },
+    });
 };
 
 // ======================================================
-// APPROVE DONOR
+// APPROVE DONOR WITH AUDIT LOG (FIXED PASSWORD ISSUE)
 // ======================================================
 
 const approveDonorApplication = async (payload: IApproveDonorPayload) => {
-	const user = await prisma.user.findUnique({
-		where: {
-			id: payload.userId,
-		},
+    const user = await prisma.user.findUnique({
+        where: {
+            id: payload.userId,
+        },
 
-		include: {
-			donorProfile: true,
-		},
-	});
+        include: {
+            donorProfile: true,
+        },
+    });
 
-	if (!user) {
-		throw new Error("User not found.");
-	}
+    if (!user) {
+        throw new Error("User not found.");
+    }
 
-	if (user.deletedAt) {
-		throw new Error("This user has been deleted.");
-	}
+    if (user.deletedAt) {
+        throw new Error("This user has been deleted.");
+    }
 
-	if (!user.isActive) {
-		throw new Error("This user account is inactive.");
-	}
+    if (!user.isActive) {
+        throw new Error("This user account is inactive.");
+    }
 
-	if (user.role !== Role.REQUESTER) {
-		throw new Error("Only requester accounts can be approved as donors.");
-	}
+    if (user.role === Role.DONOR) {
+        throw new Error("User is already a donor.");
+    }
 
-	if (!user.donorProfile) {
-		throw new Error("No donor application found.");
-	}
+    if (!user.donorProfile) {
+        throw new Error("No donor application profile found.");
+    }
 
-	if (user.donorApplicationStatus !== DonorApplicationStatus.PENDING) {
-		throw new Error("This application is not pending.");
-	}
+    const updatedUser = await prisma.$transaction(async (tx) => {
+        const updated = await tx.user.update({
+            where: {
+                id: user.id,
+            },
 
-	if (!user.password) {
-		throw new Error(
-			"This user does not have a password login. Donor approval is not allowed.",
-		);
-	}
+            data: {
+                role: Role.DONOR,
+                donorApplicationStatus: DonorApplicationStatus.APPROVED,
+            },
 
-	const updatedUser = await prisma.$transaction(async (tx) => {
-		const updated = await tx.user.update({
-			where: {
-				id: user.id,
-			},
+            omit: {
+                password: true,
+            },
+        });
 
-			data: {
-				role: Role.DONOR,
-				donorApplicationStatus: DonorApplicationStatus.APPROVED,
-			},
+        await tx.donorProfile.update({
+            where: {
+                userId: user.id,
+            },
 
-			omit: {
-				password: true,
-			},
-		});
+            data: {
+                approvedAt: new Date(),
+                rejectedAt: null,
+                rejectReason: null,
+                isAvailable: true,
+            },
+        });
 
-		await tx.donorProfile.update({
-			where: {
-				userId: user.id,
-			},
+        await tx.notification.create({
+            data: {
+                userId: user.id,
+                title: "🩸 Donor Application Approved",
+                message:
+                    "Congratulations! Your donor application has been approved. You are now a verified donor.",
+                type: NotificationType.SYSTEM,
+            },
+        });
 
-			data: {
-				approvedAt: new Date(),
-				rejectedAt: null,
-				rejectReason: null,
-			},
-		});
+        // CREATE AUDIT LOG
+        await tx.auditLog.create({
+            data: {
+                userId: payload.adminId,
+                action: "APPROVE_DONOR",
+                entity: "DONOR_PROFILE",
+                entityId: user.id,
+                oldValue: { role: user.role, status: user.donorApplicationStatus },
+                newValue: { role: Role.DONOR, status: DonorApplicationStatus.APPROVED },
+            },
+        });
 
-		await tx.notification.create({
-			data: {
-				userId: user.id,
-				title: "🩸 Donor Application Approved",
-				message:
-					"Congratulations! Your donor application has been approved. You are now a verified donor.",
-				type: NotificationType.SYSTEM,
-			},
-		});
+        return updated;
+    });
 
-		return updated;
-	});
+    // Send email asynchronously without crashing transaction
+    try {
+        const templatePath = path.join(
+            process.cwd(),
+            "src/app/templates/donor-approved.ejs",
+        );
 
-	try {
-		const templatePath = path.join(
-			process.cwd(),
-			"src/app/templates/donor-approved.ejs",
-		);
+        const html = await ejs.renderFile(templatePath, {
+            name: updatedUser.name,
+        });
 
-		const html = await ejs.renderFile(templatePath, {
-			name: updatedUser.name,
-		});
+        await transporter.sendMail({
+            from: config.email_sender,
+            to: updatedUser.email,
+            subject: "You Are Now a Verified Donor 🩸",
+            html,
+        });
+    } catch (error) {
+        console.error("Donor approval email failed:", error);
+    }
 
-		await transporter.sendMail({
-			from: config.email_sender,
-			to: updatedUser.email,
-			subject: "You Are Now a Verified Donor 🩸",
-			html,
-		});
-	} catch (error) {
-		console.error("Donor approval email failed:", error);
-	}
-
-	return {
-		message: "Donor application approved successfully.",
-		user: updatedUser,
-	};
+    return {
+        message: "Donor application approved successfully.",
+        user: updatedUser,
+    };
 };
 
 // ======================================================
-// REJECT DONOR
+// REJECT DONOR WITH AUDIT LOG
 // ======================================================
 
 const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
-	const user = await prisma.user.findUnique({
-		where: {
-			id: payload.userId,
-		},
+    const user = await prisma.user.findUnique({
+        where: {
+            id: payload.userId,
+        },
 
-		include: {
-			donorProfile: true,
-		},
-	});
+        include: {
+            donorProfile: true,
+        },
+    });
 
-	if (!user) {
-		throw new Error("User not found.");
-	}
+    if (!user) {
+        throw new Error("User not found.");
+    }
 
-	if (user.deletedAt) {
-		throw new Error("This user has been deleted.");
-	}
+    if (user.deletedAt) {
+        throw new Error("This user has been deleted.");
+    }
 
-	if (!user.isActive) {
-		throw new Error("This user account is inactive.");
-	}
+    if (!user.isActive) {
+        throw new Error("This user account is inactive.");
+    }
 
-	if (user.role !== Role.REQUESTER) {
-		throw new Error(
-			"Only requester accounts can have a donor application rejected.",
-		);
-	}
+    if (!user.donorProfile) {
+        throw new Error("No donor application profile found.");
+    }
 
-	if (!user.donorProfile) {
-		throw new Error("No donor application found.");
-	}
+    const reason = payload.reason?.trim() || "Requirements not met.";
 
-	if (user.donorApplicationStatus !== DonorApplicationStatus.PENDING) {
-		throw new Error("This application is not pending.");
-	}
+    await prisma.$transaction(async (tx) => {
+        await tx.user.update({
+            where: {
+                id: user.id,
+            },
 
-	const reason = payload.reason?.trim() || "Not specified";
+            data: {
+                donorApplicationStatus: DonorApplicationStatus.REJECTED,
+            },
+        });
 
-	await prisma.$transaction(async (tx) => {
-		await tx.user.update({
-			where: {
-				id: user.id,
-			},
+        await tx.donorProfile.update({
+            where: {
+                userId: user.id,
+            },
 
-			data: {
-				donorApplicationStatus: DonorApplicationStatus.REJECTED,
-			},
-		});
+            data: {
+                rejectedAt: new Date(),
+                rejectReason: reason,
+                approvedAt: null,
+            },
+        });
 
-		await tx.donorProfile.update({
-			where: {
-				userId: user.id,
-			},
+        await tx.notification.create({
+            data: {
+                userId: user.id,
+                title: "Donor Application Rejected",
+                message: `Your donor application has been rejected. Reason: ${reason}`,
+                type: NotificationType.SYSTEM,
+            },
+        });
 
-			data: {
-				rejectedAt: new Date(),
-				rejectReason: reason,
-				approvedAt: null,
-			},
-		});
+        // CREATE AUDIT LOG
+        await tx.auditLog.create({
+            data: {
+                userId: payload.adminId,
+                action: "REJECT_DONOR",
+                entity: "DONOR_PROFILE",
+                entityId: user.id,
+                oldValue: { status: user.donorApplicationStatus },
+                newValue: { status: DonorApplicationStatus.REJECTED, reason },
+            },
+        });
+    });
 
-		await tx.notification.create({
-			data: {
-				userId: user.id,
-				title: "Donor Application Rejected",
-				message: `Your donor application has been rejected. Reason: ${reason}`,
-				type: NotificationType.SYSTEM,
-			},
-		});
-	});
-
-	return {
-		message: "Donor application rejected successfully.",
-	};
+    return {
+        message: "Donor application rejected successfully.",
+    };
 };
 
 // ======================================================
@@ -276,87 +282,87 @@ const rejectDonorApplication = async (payload: IRejectDonorPayload) => {
 // ======================================================
 
 const getAllUsers = async (query: IGetUsersQuery) => {
-	const page = Math.max(Number(query.page) || 1, 1);
-	const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 100);
+    const page = Math.max(Number(query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 100);
 
-	const skip = (page - 1) * limit;
+    const skip = (page - 1) * limit;
 
-	const roleFilter =
-		query.role === Role.DONOR ||
-		query.role === Role.REQUESTER ||
-		query.role === Role.ADMIN
-			? query.role
-			: undefined;
+    const roleFilter =
+        query.role === Role.DONOR ||
+        query.role === Role.REQUESTER ||
+        query.role === Role.ADMIN
+            ? query.role
+            : undefined;
 
-	const where = {
-		deletedAt: null,
+    const where = {
+        deletedAt: null,
 
-		...(query.search?.trim()
-			? {
-					OR: [
-						{
-							name: {
-								contains: query.search.trim(),
-								mode: "insensitive" as const,
-							},
-						},
-						{
-							email: {
-								contains: query.search.trim(),
-								mode: "insensitive" as const,
-							},
-						},
-					],
-				}
-			: {}),
+        ...(query.search?.trim()
+            ? {
+                    OR: [
+                        {
+                            name: {
+                                contains: query.search.trim(),
+                                mode: "insensitive" as const,
+                            },
+                        },
+                        {
+                            email: {
+                                contains: query.search.trim(),
+                                mode: "insensitive" as const,
+                            },
+                        },
+                    ],
+                }
+            : {}),
 
-		...(roleFilter
-			? {
-					role: roleFilter,
-				}
-			: {}),
+        ...(roleFilter
+            ? {
+                    role: roleFilter,
+                }
+            : {}),
 
-		...(query.isActive === "true"
-			? {
-					isActive: true,
-				}
-			: query.isActive === "false"
-				? {
-						isActive: false,
-					}
-				: {}),
-	};
+        ...(query.isActive === "true"
+            ? {
+                    isActive: true,
+                }
+            : query.isActive === "false"
+                ? {
+                        isActive: false,
+                    }
+                : {}),
+    };
 
-	const [users, total] = await Promise.all([
-		prisma.user.findMany({
-			where,
-			skip,
-			take: limit,
+    const [users, total] = await Promise.all([
+        prisma.user.findMany({
+            where,
+            skip,
+            take: limit,
 
-			omit: {
-				password: true,
-			},
+            omit: {
+                password: true,
+            },
 
-			orderBy: {
-				createdAt: "desc",
-			},
-		}),
+            orderBy: {
+                createdAt: "desc",
+            },
+        }),
 
-		prisma.user.count({
-			where,
-		}),
-	]);
+        prisma.user.count({
+            where,
+        }),
+    ]);
 
-	return {
-		meta: {
-			page,
-			limit,
-			total,
-			totalPages: Math.ceil(total / limit),
-		},
+    return {
+        meta: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+        },
 
-		data: users,
-	};
+        data: users,
+    };
 };
 
 // ======================================================
@@ -364,336 +370,377 @@ const getAllUsers = async (query: IGetUsersQuery) => {
 // ======================================================
 
 const getSingleUser = async (userId: string) => {
-	const user = await prisma.user.findUnique({
-		where: {
-			id: userId,
-		},
+    const user = await prisma.user.findUnique({
+        where: {
+            id: userId,
+        },
 
-		include: {
-			donorProfile: true,
-			bloodRequests: true,
-		},
+        include: {
+            donorProfile: true,
+            bloodRequests: true,
+        },
 
-		omit: {
-			password: true,
-		},
-	});
+        omit: {
+            password: true,
+        },
+    });
 
-	if (!user) {
-		throw new Error("User not found.");
-	}
+    if (!user) {
+        throw new Error("User not found.");
+    }
 
-	if (user.deletedAt) {
-		throw new Error("This user has been deleted.");
-	}
+    if (user.deletedAt) {
+        throw new Error("This user has been deleted.");
+    }
 
-	return user;
+    return user;
 };
 
 // ======================================================
-// ACTIVATE / DEACTIVATE
+// ACTIVATE / DEACTIVATE WITH AUDIT LOG
 // ======================================================
 
 const updateUserStatus = async (payload: IUpdateUserStatusPayload) => {
-	const user = await prisma.user.findUnique({
-		where: {
-			id: payload.userId,
-		},
-	});
+    const user = await prisma.user.findUnique({
+        where: {
+            id: payload.userId,
+        },
+    });
 
-	if (!user) {
-		throw new Error("User not found.");
-	}
+    if (!user) {
+        throw new Error("User not found.");
+    }
 
-	if (user.deletedAt) {
-		throw new Error("Deleted users cannot be activated or deactivated.");
-	}
+    if (user.deletedAt) {
+        throw new Error("Deleted users cannot be activated or deactivated.");
+    }
 
-	if (user.role === Role.ADMIN) {
-		throw new Error("Admin accounts cannot be deactivated from this endpoint.");
-	}
+    if (user.role === Role.ADMIN) {
+        throw new Error("Admin accounts cannot be deactivated from this endpoint.");
+    }
 
-	if (user.isActive === payload.isActive) {
-		const { password: _, ...safeUser } = user;
+    if (user.isActive === payload.isActive) {
+        const { password: _, ...safeUser } = user;
 
-		return {
-			message: payload.isActive
-				? "User is already active."
-				: "User is already inactive.",
+        return {
+            message: payload.isActive
+                ? "User is already active."
+                : "User is already inactive.",
 
-			user: safeUser,
-		};
-	}
+            user: safeUser,
+        };
+    }
 
-	const updatedUser = await prisma.$transaction(async (tx) => {
-		const updated = await tx.user.update({
-			where: {
-				id: user.id,
-			},
+    const updatedUser = await prisma.$transaction(async (tx) => {
+        const updated = await tx.user.update({
+            where: {
+                id: user.id,
+            },
 
-			data: {
-				isActive: payload.isActive,
-			},
+            data: {
+                isActive: payload.isActive,
+            },
 
-			omit: {
-				password: true,
-			},
-		});
+            omit: {
+                password: true,
+            },
+        });
 
-		await tx.notification.create({
-			data: {
-				userId: user.id,
+        await tx.notification.create({
+            data: {
+                userId: user.id,
 
-				title: payload.isActive ? "Account Activated" : "Account Deactivated",
+                title: payload.isActive ? "Account Activated" : "Account Deactivated",
 
-				message: payload.isActive
-					? "Your account has been activated by an administrator."
-					: "Your account has been deactivated by an administrator.",
+                message: payload.isActive
+                    ? "Your account has been activated by an administrator."
+                    : "Your account has been deactivated by an administrator.",
 
-				type: NotificationType.SYSTEM,
-			},
-		});
+                type: NotificationType.SYSTEM,
+            },
+        });
 
-		return updated;
-	});
+        // CREATE AUDIT LOG
+        await tx.auditLog.create({
+            data: {
+                userId: payload.adminId,
+                action: payload.isActive ? "ACTIVATE_USER" : "DEACTIVATE_USER",
+                entity: "USER",
+                entityId: user.id,
+                oldValue: { isActive: user.isActive },
+                newValue: { isActive: payload.isActive },
+            },
+        });
 
-	return {
-		message: payload.isActive
-			? "User activated successfully."
-			: "User deactivated successfully.",
+        return updated;
+    });
 
-		user: updatedUser,
-	};
+    return {
+        message: payload.isActive
+            ? "User activated successfully."
+            : "User deactivated successfully.",
+
+        user: updatedUser,
+    };
 };
 
 // ======================================================
-// DELETE USER
+// DELETE USER WITH AUDIT LOG
 // ======================================================
 
 const deleteUser = async (payload: IDeleteUserPayload) => {
-	const user = await prisma.user.findUnique({
-		where: {
-			id: payload.userId,
-		},
-	});
+    const user = await prisma.user.findUnique({
+        where: {
+            id: payload.userId,
+        },
+    });
 
-	if (!user) {
-		throw new Error("User not found.");
-	}
+    if (!user) {
+        throw new Error("User not found.");
+    }
 
-	if (user.role === Role.ADMIN) {
-		throw new Error("Admin account cannot be deleted.");
-	}
+    if (user.role === Role.ADMIN) {
+        throw new Error("Admin account cannot be deleted.");
+    }
 
-	if (user.deletedAt) {
-		throw new Error("User is already deleted.");
-	}
+    if (user.deletedAt) {
+        throw new Error("User is already deleted.");
+    }
 
-	const deletedUser = await prisma.user.update({
-		where: {
-			id: user.id,
-		},
+    const deletedUser = await prisma.$transaction(async (tx) => {
+        const updated = await tx.user.update({
+            where: {
+                id: user.id,
+            },
 
-		data: {
-			deletedAt: new Date(),
-			isActive: false,
-		},
+            data: {
+                deletedAt: new Date(),
+                isActive: false,
+            },
 
-		omit: {
-			password: true,
-		},
-	});
+            omit: {
+                password: true,
+            },
+        });
 
-	return {
-		message: "User deleted successfully.",
-		user: deletedUser,
-	};
+        // CREATE AUDIT LOG
+        await tx.auditLog.create({
+            data: {
+                userId: payload.adminId,
+                action: "DELETE_USER",
+                entity: "USER",
+                entityId: user.id,
+                oldValue: { deletedAt: null, isActive: user.isActive },
+                newValue: { deletedAt: new Date(), isActive: false },
+            },
+        });
+
+        return updated;
+    });
+
+    return {
+        message: "User deleted successfully.",
+        user: deletedUser,
+    };
 };
+
 // ======================================================
-// VERIFY BLOOD REQUEST
+// GET ALL BLOOD REQUESTS FOR ADMIN
+// ======================================================
+
+const getAllBloodRequests = async () => {
+    return prisma.bloodRequest.findMany({
+        where: {
+            deletedAt: null,
+        },
+        include: {
+            requester: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    phone: true,
+                },
+            },
+        },
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
+};
+
+// ======================================================
+// VERIFY BLOOD REQUEST WITH AUDIT LOG
 // ======================================================
 
 const verifyBloodRequest = async (payload: IVerifyBloodRequestPayload) => {
-	const bloodRequest = await prisma.bloodRequest.findUnique({
-		where: {
-			id: payload.requestId,
-		},
+    const bloodRequest = await prisma.bloodRequest.findUnique({
+        where: {
+            id: payload.requestId,
+        },
 
-		include: {
-			requester: {
-				select: {
-					id: true,
-					name: true,
-					email: true,
-					isActive: true,
-					deletedAt: true,
-				},
-			},
-		},
-	});
+        include: {
+            requester: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    isActive: true,
+                    deletedAt: true,
+                },
+            },
+        },
+    });
 
-	if (!bloodRequest) {
-		throw new Error("Blood request not found.");
-	}
+    if (!bloodRequest) {
+        throw new Error("Blood request not found.");
+    }
 
-	if (bloodRequest.deletedAt) {
-		throw new Error("This blood request has been deleted.");
-	}
+    if (bloodRequest.deletedAt) {
+        throw new Error("This blood request has been deleted.");
+    }
 
-	if (bloodRequest.status !== RequestStatus.PENDING) {
-		throw new Error("Only pending blood requests can be verified.");
-	}
+    if (bloodRequest.status !== RequestStatus.PENDING) {
+        throw new Error("Only pending blood requests can be verified.");
+    }
 
-	if (bloodRequest.requester.deletedAt) {
-		throw new Error("The requester account has been deleted.");
-	}
+    if (bloodRequest.requester.deletedAt) {
+        throw new Error("The requester account has been deleted.");
+    }
 
-	if (!bloodRequest.requester.isActive) {
-		throw new Error("The requester account is inactive.");
-	}
+    if (!bloodRequest.requester.isActive) {
+        throw new Error("The requester account is inactive.");
+    }
 
-	const verifiedAt = new Date();
+    const verifiedAt = new Date();
 
-	const verifiedRequest = await prisma.$transaction(async (tx) => {
-		const updatedRequest = await tx.bloodRequest.update({
-			where: {
-				id: bloodRequest.id,
-			},
+    const verifiedRequest = await prisma.$transaction(async (tx) => {
+        const updatedRequest = await tx.bloodRequest.update({
+            where: {
+                id: bloodRequest.id,
+            },
 
-			data: {
-				status: RequestStatus.VERIFIED,
-				verifiedAt,
-				verifiedBy: payload.adminId,
-			},
-		});
+            data: {
+                status: RequestStatus.VERIFIED,
+                verifiedAt,
+                verifiedBy: payload.adminId,
+            },
+        });
 
-		await tx.notification.create({
-			data: {
-				userId: bloodRequest.requesterId,
+        await tx.notification.create({
+            data: {
+                userId: bloodRequest.requesterId,
 
-				title: "🩸 Blood Request Verified",
+                title: "🩸 Blood Request Verified",
 
-				message: `Your blood request for ${bloodRequest.patientName} at ${bloodRequest.hospitalName} has been verified by an administrator.`,
+                message: `Your blood request for ${bloodRequest.patientName} at ${bloodRequest.hospitalName} has been verified by an administrator.`,
 
-				type: NotificationType.REQUEST_VERIFIED,
-			},
-		});
+                type: NotificationType.REQUEST_VERIFIED,
+            },
+        });
 
-		return updatedRequest;
-	});
+        // CREATE AUDIT LOG
+        await tx.auditLog.create({
+            data: {
+                userId: payload.adminId,
+                action: "VERIFY_BLOOD_REQUEST",
+                entity: "BLOOD_REQUEST",
+                entityId: bloodRequest.id,
+                oldValue: { status: bloodRequest.status },
+                newValue: { status: RequestStatus.VERIFIED, verifiedBy: payload.adminId },
+            },
+        });
 
-	return {
-		message: "Blood request verified successfully.",
-		bloodRequest: verifiedRequest,
-	};
+        return updatedRequest;
+    });
+
+    return {
+        message: "Blood request verified successfully.",
+        bloodRequest: verifiedRequest,
+    };
 };
 
 // ======================================================
-// DASHBOARD
+// DASHBOARD STATS
 // ======================================================
 
 const getDashboardStats = async () => {
-	const [
-		totalUsers,
-		totalRequesters,
-		totalDonors,
-		totalAdmins,
-		pendingApplications,
-		approvedApplications,
-		rejectedApplications,
-		activeUsers,
-		inactiveUsers,
-	] = await Promise.all([
-		prisma.user.count({
-			where: {
-				deletedAt: null,
-			},
-		}),
+    const [
+        totalUsers,
+        totalRequesters,
+        totalDonors,
+        totalAdmins,
+        pendingApplications,
+        approvedApplications,
+        rejectedApplications,
+        activeUsers,
+        inactiveUsers,
+        totalBloodRequests,
+    ] = await Promise.all([
+        prisma.user.count({
+            where: { deletedAt: null },
+        }),
+        prisma.user.count({
+            where: { role: Role.REQUESTER, deletedAt: null },
+        }),
+        prisma.user.count({
+            where: { role: Role.DONOR, deletedAt: null },
+        }),
+        prisma.user.count({
+            where: { role: Role.ADMIN, deletedAt: null },
+        }),
+        prisma.user.count({
+            where: { donorApplicationStatus: DonorApplicationStatus.PENDING, deletedAt: null },
+        }),
+        prisma.user.count({
+            where: { donorApplicationStatus: DonorApplicationStatus.APPROVED, deletedAt: null },
+        }),
+        prisma.user.count({
+            where: { donorApplicationStatus: DonorApplicationStatus.REJECTED, deletedAt: null },
+        }),
+        prisma.user.count({
+            where: { isActive: true, deletedAt: null },
+        }),
+        prisma.user.count({
+            where: { isActive: false, deletedAt: null },
+        }),
+        prisma.bloodRequest.count({
+            where: { deletedAt: null },
+        }),
+    ]);
 
-		prisma.user.count({
-			where: {
-				role: Role.REQUESTER,
-				deletedAt: null,
-			},
-		}),
-
-		prisma.user.count({
-			where: {
-				role: Role.DONOR,
-				deletedAt: null,
-			},
-		}),
-
-		prisma.user.count({
-			where: {
-				role: Role.ADMIN,
-				deletedAt: null,
-			},
-		}),
-
-		prisma.user.count({
-			where: {
-				donorApplicationStatus: DonorApplicationStatus.PENDING,
-				deletedAt: null,
-			},
-		}),
-
-		prisma.user.count({
-			where: {
-				donorApplicationStatus: DonorApplicationStatus.APPROVED,
-				deletedAt: null,
-			},
-		}),
-
-		prisma.user.count({
-			where: {
-				donorApplicationStatus: DonorApplicationStatus.REJECTED,
-				deletedAt: null,
-			},
-		}),
-
-		prisma.user.count({
-			where: {
-				isActive: true,
-				deletedAt: null,
-			},
-		}),
-
-		prisma.user.count({
-			where: {
-				isActive: false,
-				deletedAt: null,
-			},
-		}),
-	]);
-
-	return {
-		users: {
-			total: totalUsers,
-			requesters: totalRequesters,
-			donors: totalDonors,
-			admins: totalAdmins,
-			active: activeUsers,
-			inactive: inactiveUsers,
-		},
-
-		donorApplications: {
-			pending: pendingApplications,
-			approved: approvedApplications,
-			rejected: rejectedApplications,
-		},
-	};
+    return {
+        totalUsers,
+        totalDonors,
+        totalRequesters,
+        totalBloodRequests,
+        pendingDonorApplications: pendingApplications,
+        users: {
+            total: totalUsers,
+            requesters: totalRequesters,
+            donors: totalDonors,
+            admins: totalAdmins,
+            active: activeUsers,
+            inactive: inactiveUsers,
+        },
+        donorApplications: {
+            pending: pendingApplications,
+            approved: approvedApplications,
+            rejected: rejectedApplications,
+        },
+    };
 };
 
 export const AdminService = {
-	getDonorApplications,
-	getPendingDonorApplications,
-	approveDonorApplication,
-	rejectDonorApplication,
-	verifyBloodRequest,
-	getAllUsers,
-	getSingleUser,
-	updateUserStatus,
-	deleteUser,
-	getDashboardStats,
+    getDonorApplications,
+    getPendingDonorApplications,
+    approveDonorApplication,
+    rejectDonorApplication,
+    getAllBloodRequests,
+    verifyBloodRequest,
+    getAllUsers,
+    getSingleUser,
+    updateUserStatus,
+    deleteUser,
+    getDashboardStats,
 };

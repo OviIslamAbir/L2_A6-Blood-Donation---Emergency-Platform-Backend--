@@ -19,44 +19,48 @@ router.get("/dashboard", auth("ADMIN"), AdminController.getDashboardStats);
 // ======================================================
 
 router.get(
-	"/donor-applications",
-	auth("ADMIN"),
-	AdminController.getDonorApplications,
+    "/donor-applications",
+    auth("ADMIN"),
+    AdminController.getDonorApplications,
 );
 
 router.get(
-	"/donor-applications/pending",
-	auth("ADMIN"),
-	AdminController.getPendingDonorApplications,
-);
-// ======================================================
-// VERIFY BLOOD REQUEST
-// ======================================================
-
-router.patch(
-	"/blood-requests/:requestId/verify",
-	auth("ADMIN"),
-	AdminController.verifyBloodRequest,
-);
-// ======================================================
-// APPROVE DONOR
-// ======================================================
-
-router.patch(
-	"/donor/:userId/approve",
-	auth("ADMIN"),
-	AdminController.approveDonorApplication,
+    "/donor-applications/pending",
+    auth("ADMIN"),
+    AdminController.getPendingDonorApplications,
 );
 
 // ======================================================
-// REJECT DONOR
+// BLOOD REQUESTS (GET & VERIFY)
+// ======================================================
+
+router.get(
+    "/blood-requests",
+    auth("ADMIN"),
+    AdminController.getAllBloodRequests,
+);
+
+router.patch(
+    "/blood-requests/:requestId/verify",
+    auth("ADMIN"),
+    AdminController.verifyBloodRequest,
+);
+
+// ======================================================
+// APPROVE / REJECT DONOR
 // ======================================================
 
 router.patch(
-	"/donor/:userId/reject",
-	auth("ADMIN"),
-	validateRequest(adminValidation.rejectDonorSchema),
-	AdminController.rejectDonorApplication,
+    "/donor/:userId/approve",
+    auth("ADMIN"),
+    AdminController.approveDonorApplication,
+);
+
+router.patch(
+    "/donor/:userId/reject",
+    auth("ADMIN"),
+    validateRequest(adminValidation.rejectDonorSchema),
+    AdminController.rejectDonorApplication,
 );
 
 // ======================================================
@@ -72,10 +76,10 @@ router.get("/users/:userId", auth("ADMIN"), AdminController.getSingleUser);
 // ======================================================
 
 router.patch(
-	"/users/:userId/status",
-	auth("ADMIN"),
-	validateRequest(adminValidation.updateUserStatusSchema),
-	AdminController.updateUserStatus,
+    "/users/:userId/status",
+    auth("ADMIN"),
+    validateRequest(adminValidation.updateUserStatusSchema),
+    AdminController.updateUserStatus,
 );
 
 // ======================================================

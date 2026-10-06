@@ -1,7 +1,9 @@
 import type { Request, Response } from "express";
+import httpStatus from "http-status";
 
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
+import type { IRequestUser } from "../auth/auth.interface";
 import { AdminService } from "./admin.service";
 
 // ======================================================
@@ -9,14 +11,14 @@ import { AdminService } from "./admin.service";
 // ======================================================
 
 const getDashboardStats = catchAsync(async (_req: Request, res: Response) => {
-	const result = await AdminService.getDashboardStats();
+    const result = await AdminService.getDashboardStats();
 
-	sendResponse(res, {
-		statusCode: 200,
-		success: true,
-		message: "Dashboard statistics retrieved successfully.",
-		data: result,
-	});
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Dashboard statistics retrieved successfully.",
+        data: result,
+    });
 });
 
 // ======================================================
@@ -24,16 +26,16 @@ const getDashboardStats = catchAsync(async (_req: Request, res: Response) => {
 // ======================================================
 
 const getDonorApplications = catchAsync(
-	async (_req: Request, res: Response) => {
-		const result = await AdminService.getDonorApplications();
+    async (_req: Request, res: Response) => {
+        const result = await AdminService.getDonorApplications();
 
-		sendResponse(res, {
-			statusCode: 200,
-			success: true,
-			message: "Donor applications retrieved successfully.",
-			data: result,
-		});
-	},
+        sendResponse(res, {
+            statusCode: httpStatus.OK,
+            success: true,
+            message: "Donor applications retrieved successfully.",
+            data: result,
+        });
+    },
 );
 
 // ======================================================
@@ -41,16 +43,16 @@ const getDonorApplications = catchAsync(
 // ======================================================
 
 const getPendingDonorApplications = catchAsync(
-	async (_req: Request, res: Response) => {
-		const result = await AdminService.getPendingDonorApplications();
+    async (_req: Request, res: Response) => {
+        const result = await AdminService.getPendingDonorApplications();
 
-		sendResponse(res, {
-			statusCode: 200,
-			success: true,
-			message: "Pending donor applications retrieved successfully.",
-			data: result,
-		});
-	},
+        sendResponse(res, {
+            statusCode: httpStatus.OK,
+            success: true,
+            message: "Pending donor applications retrieved successfully.",
+            data: result,
+        });
+    },
 );
 
 // ======================================================
@@ -58,23 +60,25 @@ const getPendingDonorApplications = catchAsync(
 // ======================================================
 
 const approveDonorApplication = catchAsync(
-	async (req: Request, res: Response) => {
-		if (!req.user) {
-			throw new Error("User information is missing in the request.");
-		}
+    async (req: Request, res: Response) => {
+        const admin = req.user as IRequestUser;
 
-		const result = await AdminService.approveDonorApplication({
-			userId: String(req.params.userId),
-			adminId: req.user.userId,
-		});
+        if (!admin) {
+            throw new Error("User information is missing in the request.");
+        }
 
-		sendResponse(res, {
-			statusCode: 200,
-			success: true,
-			message: result.message,
-			data: result.user,
-		});
-	},
+        const result = await AdminService.approveDonorApplication({
+            userId: String(req.params.userId),
+            adminId: admin.userId,
+        });
+
+        sendResponse(res, {
+            statusCode: httpStatus.OK,
+            success: true,
+            message: result.message,
+            data: result.user,
+        });
+    },
 );
 
 // ======================================================
@@ -82,24 +86,26 @@ const approveDonorApplication = catchAsync(
 // ======================================================
 
 const rejectDonorApplication = catchAsync(
-	async (req: Request, res: Response) => {
-		if (!req.user) {
-			throw new Error("User information is missing in the request.");
-		}
+    async (req: Request, res: Response) => {
+        const admin = req.user as IRequestUser;
 
-		const result = await AdminService.rejectDonorApplication({
-			userId: String(req.params.userId),
-			adminId: req.user.userId,
-			reason: req.body?.reason,
-		});
+        if (!admin) {
+            throw new Error("User information is missing in the request.");
+        }
 
-		sendResponse(res, {
-			statusCode: 200,
-			success: true,
-			message: result.message,
-			data: null,
-		});
-	},
+        const result = await AdminService.rejectDonorApplication({
+            userId: String(req.params.userId),
+            adminId: admin.userId,
+            reason: req.body?.reason,
+        });
+
+        sendResponse(res, {
+            statusCode: httpStatus.OK,
+            success: true,
+            message: result.message,
+            data: null,
+        });
+    },
 );
 
 // ======================================================
@@ -107,14 +113,14 @@ const rejectDonorApplication = catchAsync(
 // ======================================================
 
 const getAllUsers = catchAsync(async (req: Request, res: Response) => {
-	const result = await AdminService.getAllUsers(req.query);
+    const result = await AdminService.getAllUsers(req.query);
 
-	sendResponse(res, {
-		statusCode: 200,
-		success: true,
-		message: "Users retrieved successfully.",
-		data: result,
-	});
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Users retrieved successfully.",
+        data: result,
+    });
 });
 
 // ======================================================
@@ -122,14 +128,14 @@ const getAllUsers = catchAsync(async (req: Request, res: Response) => {
 // ======================================================
 
 const getSingleUser = catchAsync(async (req: Request, res: Response) => {
-	const result = await AdminService.getSingleUser(String(req.params.userId));
+    const result = await AdminService.getSingleUser(String(req.params.userId));
 
-	sendResponse(res, {
-		statusCode: 200,
-		success: true,
-		message: "User retrieved successfully.",
-		data: result,
-	});
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "User retrieved successfully.",
+        data: result,
+    });
 });
 
 // ======================================================
@@ -137,22 +143,24 @@ const getSingleUser = catchAsync(async (req: Request, res: Response) => {
 // ======================================================
 
 const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
-	if (!req.user) {
-		throw new Error("User information is missing in the request.");
-	}
+    const admin = req.user as IRequestUser;
 
-	const result = await AdminService.updateUserStatus({
-		userId: String(req.params.userId),
-		adminId: req.user.userId,
-		isActive: req.body.isActive,
-	});
+    if (!admin) {
+        throw new Error("User information is missing in the request.");
+    }
 
-	sendResponse(res, {
-		statusCode: 200,
-		success: true,
-		message: result.message,
-		data: result.user,
-	});
+    const result = await AdminService.updateUserStatus({
+        userId: String(req.params.userId),
+        adminId: admin.userId,
+        isActive: req.body.isActive,
+    });
+
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: result.message,
+        data: result.user,
+    });
 });
 
 // ======================================================
@@ -160,56 +168,80 @@ const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
 // ======================================================
 
 const deleteUser = catchAsync(async (req: Request, res: Response) => {
-	if (!req.user) {
-		throw new Error("User information is missing in the request.");
-	}
+    const admin = req.user as IRequestUser;
 
-	const result = await AdminService.deleteUser({
-		userId: String(req.params.userId),
-		adminId: req.user.userId,
-	});
+    if (!admin) {
+        throw new Error("User information is missing in the request.");
+    }
 
-	sendResponse(res, {
-		statusCode: 200,
-		success: true,
-		message: result.message,
-		data: result.user,
-	});
+    const result = await AdminService.deleteUser({
+        userId: String(req.params.userId),
+        adminId: admin.userId,
+    });
+
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: result.message,
+        data: result.user,
+    });
 });
+
+// ======================================================
+// GET ALL BLOOD REQUESTS FOR ADMIN
+// ======================================================
+
+const getAllBloodRequests = catchAsync(
+    async (_req: Request, res: Response) => {
+        const result = await AdminService.getAllBloodRequests();
+
+        sendResponse(res, {
+            statusCode: httpStatus.OK,
+            success: true,
+            message: "Blood requests retrieved successfully.",
+            data: result,
+        });
+    },
+);
+
 // ======================================================
 // VERIFY BLOOD REQUEST
 // ======================================================
 
 const verifyBloodRequest = catchAsync(async (req: Request, res: Response) => {
-	if (!req.user) {
-		throw new Error("User information is missing in the request.");
-	}
+    const admin = req.user as IRequestUser;
 
-	const result = await AdminService.verifyBloodRequest({
-		requestId: String(req.params.requestId),
-		adminId: req.user.userId,
-	});
+    if (!admin) {
+        throw new Error("User information is missing in the request.");
+    }
 
-	sendResponse(res, {
-		statusCode: 200,
-		success: true,
-		message: result.message,
-		data: result.bloodRequest,
-	});
+    const result = await AdminService.verifyBloodRequest({
+        requestId: String(req.params.requestId),
+        adminId: admin.userId,
+    });
+
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: result.message,
+        data: result.bloodRequest,
+    });
 });
+
 // ======================================================
 // EXPORT
 // ======================================================
 
 export const AdminController = {
-	getDashboardStats,
-	getDonorApplications,
-	getPendingDonorApplications,
-	approveDonorApplication,
-	rejectDonorApplication,
-	getAllUsers,
-	getSingleUser,
-	updateUserStatus,
-	deleteUser,
-	verifyBloodRequest,
+    getDashboardStats,
+    getDonorApplications,
+    getPendingDonorApplications,
+    approveDonorApplication,
+    rejectDonorApplication,
+    getAllUsers,
+    getSingleUser,
+    updateUserStatus,
+    deleteUser,
+    getAllBloodRequests,
+    verifyBloodRequest,
 };

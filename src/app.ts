@@ -24,13 +24,28 @@ import { AuditLogRoutes } from "./app/module/auditLog/auditLog.route";
 const app: Application = express();
 
 // ======================================================
-// CORS
+// CORS (FIXED FOR LOCALHOST & PRODUCTION)
 // ======================================================
+
+const allowedOrigins = [
+	"http://localhost:3000",
+	"http://localhost:3001",
+	config.bak_url, // .env e jodi kono frontend url thake
+].filter(Boolean);
 
 app.use(
 	cors({
-		origin: config.bak_url,
+		origin: (origin, callback) => {
+			// Postman or Mobile Request e origin undefined thake, so oita allow kora hocche
+			if (!origin || allowedOrigins.includes(origin)) {
+				callback(null, true);
+			} else {
+				callback(new Error("CORS policy error: Origin not allowed"));
+			}
+		},
 		credentials: true,
+		methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+		allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 	}),
 );
 
