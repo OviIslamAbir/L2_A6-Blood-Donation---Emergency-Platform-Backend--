@@ -13,13 +13,10 @@ const router = Router();
 // ======================================================
 
 router.get(
-	"/",
-
-	auth(Role.ADMIN),
-
-	validateRequest(auditLogValidation.getAuditLogsSchema),
-
-	AuditLogController.getAuditLogs,
+  "/",
+  auth(Role.ADMIN),
+  validateRequest(auditLogValidation.getAuditLogsSchema),
+  AuditLogController.getAuditLogs
 );
 
 // ======================================================
@@ -27,11 +24,9 @@ router.get(
 // ======================================================
 
 router.get(
-	"/:auditLogId",
-
-	auth(Role.ADMIN),
-
-	AuditLogController.getSingleAuditLog,
+  "/:auditLogId",
+  auth(Role.ADMIN),
+  AuditLogController.getSingleAuditLog
 );
 
 export const AuditLogRoutes = router;

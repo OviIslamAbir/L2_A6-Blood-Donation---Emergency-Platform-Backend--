@@ -5,6 +5,7 @@ import httpStatus from "http-status";
 import { PaymentServices } from "./payment.service";
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
+import { AppError } from "../../utils/apiError";
 
 // ======================================================
 // CREATE PAYMENT
@@ -142,12 +143,34 @@ const getSinglePayment = catchAsync(async (req: Request, res: Response) => {
 		data: result,
 	});
 });
+// ======================================================
+// CONFIRM STRIPE PAYMENT
+// ======================================================
 
+const confirmStripePayment = catchAsync(async (req: Request, res: Response) => {
+    const user = req.user!;
+    const { paymentId } = req.body;
+
+    if (!paymentId) {
+        throw new AppError(httpStatus.BAD_REQUEST, "Payment ID is required.");
+    }
+
+    const result = await PaymentServices.confirmStripePayment(paymentId, user.userId);
+
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: "Stripe payment confirmed successfully.",
+        data: result,
+    });
+});
+	
 export const PaymentController = {
-	createPayment,
-	executeBkashPayment,
-	bkashCallback,
-	stripeWebhook,
-	getMyPayments,
-	getSinglePayment,
+    createPayment,
+    executeBkashPayment,
+    bkashCallback,
+    stripeWebhook,
+    confirmStripePayment, 
+    getMyPayments,
+    getSinglePayment,
 };

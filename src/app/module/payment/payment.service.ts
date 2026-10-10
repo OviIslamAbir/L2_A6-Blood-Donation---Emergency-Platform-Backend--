@@ -172,11 +172,11 @@ const createPayment = async (
 			}
 
 			const successUrl =
-				`${config.bak_url}/api/v1/payments/payment-success` +
+				`https://blood-donation-frontend-eta.vercel.app/requester/payments/success` +
 				`?paymentId=${encodeURIComponent(payment.id)}`;
 
 			const cancelUrl =
-				`${config.bak_url}/api/v1/payments/payment-cancel` +
+				`https://blood-donation-frontend-eta.vercel.app/requester/payments/cancel` +
 				`?paymentId=${encodeURIComponent(payment.id)}`;
 
 			const session = await stripe.checkout.sessions.create({
@@ -1143,12 +1143,71 @@ const getSinglePayment = async (paymentId: string, userId: string) => {
 
 	return payment;
 };
+// ======================================================
+// CONFIRM STRIPE PAYMENT (FALLBACK FOR SUCCESS REDIRECT)
+// ======================================================
+
+const confirmStripePayment = async (paymentId: string, userId: string) => {
+    const payment = await prisma.payment.findUnique({
+        where: { id: paymentId },
+    });
+
+    if (!payment) {
+        throw new AppError(httpStatus.NOT_FOUND, "Payment not found.");
+    }
+
+    if (payment.userId !== userId) {
+        throw new AppError(httpStatus.FORBIDDEN, "Unauthorized access.");
+    }
+
+    
+    if (payment.status === PaymentStatus.PAID) {
+        return payment;
+    }
+
+    const updatedPayment = await prisma.$transaction(async (tx) => {
+        const updated = await tx.payment.update({
+            where: { id: paymentId },
+            data: {
+                status: PaymentStatus.PAID,
+                paidAt: new Date(),
+            },
+        });
+
+        await tx.notification.create({
+            data: {
+                userId: payment.userId,
+                title: "Payment Successful",
+                message: "Your Stripe payment has been confirmed successfully.",
+                type: NotificationType.PAYMENT,
+            },
+        });
+
+        return updated;
+    });
+
+    await AuditLogServices.createAuditLog({
+        userId,
+        action: "STRIPE_PAYMENT_PAID",
+        entity: "Payment",
+        entityId: paymentId,
+        oldValue: { status: payment.status },
+        newValue: {
+            status: PaymentStatus.PAID,
+            provider: PaymentProvider.STRIPE,
+            paidAt: updatedPayment.paidAt,
+        },
+    });
+
+    return updatedPayment;
+};
 
 export const PaymentServices = {
-	createPayment,
-	executeBkashPayment,
-	bkashCallback,
-	stripeWebhook,
-	getMyPayments,
-	getSinglePayment,
+    createPayment,
+    executeBkashPayment,
+    bkashCallback,
+    stripeWebhook,
+    confirmStripePayment, 
+    getMyPayments,
+    getSinglePayment,
 };

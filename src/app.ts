@@ -30,7 +30,8 @@ const app: Application = express();
 const allowedOrigins = [
 	"http://localhost:3000",
 	"http://localhost:3001",
-	config.bak_url, // .env e jodi kono frontend url thake
+	"https://blood-donation-frontend-eta.vercel.app",
+	config.bak_url, 
 ].filter(Boolean);
 
 app.use(
