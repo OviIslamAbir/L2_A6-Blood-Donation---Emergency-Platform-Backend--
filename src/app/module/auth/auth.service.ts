@@ -394,7 +394,7 @@ const refreshToken = async (token: string) => {
 };
 
 // ======================================================
-// GOOGLE LOGIN (ALLOW DONOR AND PENDING USERS)
+// GOOGLE LOGIN (AUTO FIX FOR REQUESTER TYPE)
 // ======================================================
 
 const googleLogin = async (payload: IGoogleLoginPayload) => {
@@ -437,7 +437,6 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
     });
 
     if (user) {
-        // Only restrict admin accounts from google login
         if (user.role === Role.ADMIN) {
             throw new Error("Google login is not available for admin accounts.");
         }
@@ -450,16 +449,22 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
             throw new Error("Your account has been deleted.");
         }
 
-        // Auto link googleId if it wasn't linked before
+        // Auto link googleId and set default requesterType if missing
+        const updateData: any = {};
+
         if (!user.googleId) {
+            updateData.googleId = googlePayload.sub;
+            updateData.emailVerified = true;
+        }
+
+        if (!user.requesterType) {
+            updateData.requesterType = "PATIENT";
+        }
+
+        if (Object.keys(updateData).length > 0) {
             user = await prisma.user.update({
-                where: {
-                    id: user.id,
-                },
-                data: {
-                    googleId: googlePayload.sub,
-                    emailVerified: true,
-                },
+                where: { id: user.id },
+                data: updateData,
                 include: {
                     donorProfile: true,
                 },
@@ -480,7 +485,7 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
                 googleId: googlePayload.sub,
                 emailVerified: true,
                 isActive: true,
-                requesterType: null,
+                requesterType: "PATIENT",
                 donorApplicationStatus: DonorApplicationStatus.NONE,
             },
             include: {
